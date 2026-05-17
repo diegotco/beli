@@ -11,12 +11,23 @@ from pathlib import Path
 
 from telethon import TelegramClient
 from telethon.errors import FloodWaitError, UsernameNotOccupiedError
-from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.functions.contacts import GetContactsRequest, ImportContactsRequest
+from telethon.tl.types import InputPhoneContact
 
 logger = logging.getLogger("beli.tools.telegram_sender")
 
-_SESSION_PATH = str(Path(__file__).parent.parent / "data" / "telethon_session")
-_CACHE_PATH   = Path(__file__).parent.parent / "data" / "contact_cache.json"
+_DIEGO_SESSION_PATH = str(Path(__file__).parent.parent / "data" / "telethon_session")
+_BELI_SESSION_PATH  = str(Path(__file__).parent.parent / "data" / "beli_session")
+_CACHE_PATH         = Path(__file__).parent.parent / "data" / "contact_cache.json"
+
+# Shared Beli client — set by BeliListener on startup so send_telegram_message
+# reuses the already-open connection instead of creating a second one.
+_shared_beli_client = None
+
+def set_shared_beli_client(client) -> None:
+    global _shared_beli_client
+    _shared_beli_client = client
+    logger.info("Shared Beli Telegram client registered.")
 
 
 # ── Cache helpers ────────────────────────────────────────────────────────────
@@ -47,12 +58,33 @@ def _save_to_cache(nickname: str, name: str, telegram_id: int = None, username: 
 async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
     """
     Searches Diego's Telegram contacts by name.
-    Returns a description of what was found — does NOT send anything.
+    Checks the confirmed-contact cache first — if a match is found there,
+    returns immediately without hitting the Telegram API and without asking
+    Diego for confirmation (it was already confirmed in a prior session).
     """
     logger.info(f"Searching Telegram contacts for: '{name}'")
+    search_lower = name.lower().strip()
 
+    # ── Cache-first: skip API call if already confirmed ──────────────────────
+    cache = _load_cache()
+    for nick, data in cache.items():
+        cached_name = (data.get("name") or "").lower()
+        if search_lower and search_lower in cached_name:
+            tid    = data.get("telegram_id")
+            uname  = data.get("username") or ""
+            logger.info(f"Cache hit for '{name}' → nickname='{nick}' (id={tid})")
+            return (
+                f"Contacto '{data['name']}' ya confirmado previamente "
+                f"(nickname='{nick}', telegram_id={tid}"
+                f"{', @' + uname if uname else ''}). "
+                f"Envía el mensaje directamente con "
+                f"send_telegram_message(nickname='{nick}', message='...'). "
+                f"NO pidas confirmación a Diego — ya fue confirmado antes."
+            )
+
+    # ── Live search via Telegram API (uses Diego's session = his contact list) ─
     try:
-        async with TelegramClient(_SESSION_PATH, api_id, api_hash) as client:
+        async with TelegramClient(_DIEGO_SESSION_PATH, api_id, api_hash) as client:
             result = await client(GetContactsRequest(hash=0))
             all_contacts = result.users
             search = name.lower().strip()
@@ -113,57 +145,98 @@ async def send_telegram_message(
     message: str,
     telegram_id: int | None = None,
     contact_phone: str | None = None,
+    username: str | None = None,
 ) -> str:
     """
     Sends a Telegram message using:
     - telegram_id (int): direct Telegram user ID
+    - username (str): @username, works for users AND bots (e.g. '@hermes_de_diego_bot')
     - contact_phone (str): phone in international format e.g. '+19293959561'
-    - nickname only: looks up in cache (telegram_id or phone)
+    - nickname only: looks up in cache
     """
     cache = _load_cache()
     cached = cache.get(nickname.lower())
+
+    # Normalize username — strip leading @ if present
+    if username:
+        username = username.lstrip("@")
 
     # Resolve identifier — prefer explicit args, fall back to cache
     if telegram_id:
         identifier = int(telegram_id)
         logger.info(f"Using telegram_id={telegram_id} for '{nickname}'")
+    elif username:
+        identifier = username          # Telethon resolves @username natively
+        logger.info(f"Using username=@{username} for '{nickname}'")
     elif contact_phone:
         identifier = contact_phone
         logger.info(f"Using phone={contact_phone} for '{nickname}'")
     elif cached:
         if cached.get("telegram_id"):
             identifier = int(cached["telegram_id"])
+        elif cached.get("username"):
+            identifier = cached["username"]
         elif cached.get("phone"):
             identifier = cached["phone"]
         else:
-            return f"El contacto '{nickname}' está en caché pero sin ID ni teléfono. Usa find_telegram_contact de nuevo."
+            return f"El contacto '{nickname}' está en caché pero sin ID, @username ni teléfono. Usa find_telegram_contact de nuevo."
         logger.info(f"Cache hit: '{nickname}' → {cached['name']} ({identifier})")
     else:
         return (
             f"No tengo forma de contactar a '{nickname}'. "
-            f"Usa find_telegram_contact('{nickname}') primero para obtener su ID o teléfono."
+            f"Proporciona telegram_id, @username, o teléfono."
         )
 
-    try:
-        async with TelegramClient(_SESSION_PATH, api_id, api_hash) as client:
+    # Phone number to use as fallback (for new accounts with no prior contact history)
+    phone_fallback = contact_phone or (cached or {}).get("phone", "") if cached else contact_phone
+
+    async def _do_send(client) -> str:
+        nonlocal identifier
+        try:
             entity = await client.get_entity(identifier)
-            await client.send_message(entity, message)
+        except Exception as e:
+            # Beli's account is new — it may lack the access_hash for this user.
+            # Import via phone number to resolve the entity.
+            if phone_fallback:
+                logger.info(f"get_entity failed ({e}), trying phone import: {phone_fallback}")
+                # Use real name from cache; fall back to nickname
+                cached_name = (cached or {}).get("name", "") or nickname.capitalize()
+                name_parts  = cached_name.split()
+                first       = name_parts[0] if name_parts else nickname.capitalize()
+                last        = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
+                result = await client(ImportContactsRequest([
+                    InputPhoneContact(client_id=0, phone=phone_fallback, first_name=first, last_name=last)
+                ]))
+                if result.users:
+                    entity = result.users[0]
+                else:
+                    return f"No se pudo resolver el contacto. Verifica que el número {phone_fallback} esté en Telegram."
+            else:
+                raise
+        await client.send_message(entity, message)
 
-            full_name = f"{getattr(entity, 'first_name', '')} {getattr(entity, 'last_name', '')}".strip()
-            username  = getattr(entity, "username", "") or ""
-            entity_id = getattr(entity, "id", None)
+        full_name = f"{getattr(entity, 'first_name', '') or ''} {getattr(entity, 'last_name', '') or ''}".strip()
+        username  = getattr(entity, "username", "") or ""
+        entity_id = getattr(entity, "id", None)
 
-            # Cache the confirmed contact (store both id and phone for robustness)
-            _save_to_cache(
-                nickname=nickname,
-                name=full_name,
-                telegram_id=entity_id,
-                username=username,
-                phone=contact_phone or (cached or {}).get("phone", ""),
-            )
+        _save_to_cache(
+            nickname=nickname,
+            name=full_name,
+            telegram_id=entity_id,
+            username=username,
+            phone=contact_phone or (cached or {}).get("phone", ""),
+        )
+        logger.info(f"Message sent to {full_name} (id={entity_id})")
+        return f"✓ ENVIADO EXITOSAMENTE a {full_name} ({'@'+username if username else contact_phone or 'sin @username'})."
 
-            logger.info(f"Message sent to {full_name} (id={entity_id})")
-            return f"✓ ENVIADO EXITOSAMENTE a {full_name} ({'@'+username if username else contact_phone or 'sin @username'})."
+    try:
+        # Prefer the shared client (already open by the listener) to avoid session lock
+        if _shared_beli_client and _shared_beli_client.is_connected():
+            logger.info("Using shared Beli client for sending.")
+            return await _do_send(_shared_beli_client)
+        else:
+            async with TelegramClient(_BELI_SESSION_PATH, api_id, api_hash) as client:
+                return await _do_send(client)
 
     except FloodWaitError as e:
         return f"Telegram pidió esperar {e.seconds} segundos antes de enviar más mensajes."

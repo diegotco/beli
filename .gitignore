@@ -5,6 +5,7 @@
 data/*.db
 data/*.session
 data/contact_cache.json
+data/beli_session.session
 
 # Logs
 logs/*.log

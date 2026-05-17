@@ -1,7 +1,9 @@
 """
 tools/executor.py - Routes Claude's tool calls to the right handler.
 """
+import asyncio
 import logging
+from functools import partial
 from config import config
 from tools.telegram_sender import find_telegram_contact, send_telegram_message
 from tools.email_sender import send_email
@@ -27,16 +29,22 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             nickname=tool_input.get("nickname", ""),
             message=tool_input.get("message", ""),
             telegram_id=tool_input.get("telegram_id"),
+            username=tool_input.get("username"),
             contact_phone=tool_input.get("contact_phone"),
         )
 
     if tool_name == "send_email":
-        return await send_email(
-            api_key=config.AGENTMAIL_API_KEY,
-            inbox_id=config.AGENTMAIL_INBOX_ID,
-            to=tool_input.get("to", ""),
-            subject=tool_input.get("subject", ""),
-            body=tool_input.get("body", ""),
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                send_email,
+                api_key=config.AGENTMAIL_API_KEY,
+                inbox_id=config.AGENTMAIL_INBOX_ID,
+                to=tool_input.get("to", ""),
+                subject=tool_input.get("subject", ""),
+                body=tool_input.get("body", ""),
+            ),
         )
 
     logger.warning(f"Unknown tool called: {tool_name}")

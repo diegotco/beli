@@ -20,7 +20,7 @@ def send_email(api_key: str, inbox_id: str, to: str, subject: str, body: str) ->
     if not api_key:
         return "No está configurada la AGENTMAIL_API_KEY en el archivo .env."
 
-    url = f"{AGENTMAIL_BASE_URL}/inboxes/{inbox_id}/messages"
+    url = f"{AGENTMAIL_BASE_URL}/inboxes/{inbox_id}/messages/send"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",

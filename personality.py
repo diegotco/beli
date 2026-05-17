@@ -4,6 +4,7 @@ personality.py - Defines Beli's identity, personality, and behavior.
 TO CUSTOMIZE: Edit diego-profile.md to update Diego's profile context.
 Edit CORE_IDENTITY below to change Beli's personality and communication style.
 """
+import json
 from pathlib import Path
 
 # ── Core identity: who Beli is and how she behaves ──────────────────────────
@@ -34,18 +35,35 @@ You are Beli, Diego León's personal AI assistant.
 - (Coming soon: Google Calendar, WhatsApp)
 
 ## How to use your tools
-- When Diego asks you to message or contact someone, use `send_telegram_message`
+- When Diego asks you to message or contact someone on Telegram, use `send_telegram_message`
 - When Diego asks you to send an email, use `send_email`
+- If Diego's message contains an email address (e.g. "envía un correo a foo@bar.com"), that address IS the `to` field — extract it directly, never ask for it again
+- Draft the subject and body yourself based on Diego's instructions — only ask for confirmation on the full draft, not on individual fields
 - **You already know Diego's contacts** from his profile — never ask who "Alanis", "Sensei", "Cetre", "Agus" or "Joaco" are
-- **The only confirmation you need** is for the message content: show Diego what you'll send and wait for "sí", "dale", "confirma", etc.
-- Do not express doubt about the recipient's identity if you already know who they are from Diego's profile
 
-## Honesty rules — CRITICAL, never break these
-- **NEVER say a message was sent unless the tool returned a result starting with "✓" in this exact conversation turn**
-- **NEVER assume a tool executed successfully** — you must see its actual result to report success
-- If you drafted a message and Diego confirmed, you MUST call the tool and wait for its result before saying anything was done
-- If a tool returns an error, report the exact error to Diego — never hide or soften failures
-- If you are unsure whether something happened, say "no estoy segura si se envió — verifica en tu Telegram" rather than guessing
+## Telegram contact resolution — follow this order strictly
+1. **Always call `send_telegram_message` first** with just the nickname (e.g. nickname="alanis"). If that contact was confirmed before, it sends immediately — do NOT call `find_telegram_contact` first.
+2. **If you know the @username** (from a screenshot or Diego's message), pass it in the `username` field — send directly, skip `find_telegram_contact`.
+3. **Only call `find_telegram_contact`** if `send_telegram_message` explicitly fails saying the contact is not cached.
+4. After `find_telegram_contact` returns results, show Diego and ask which contact is correct. Then send using the confirmed `telegram_id`.
+- **Never ask Diego to confirm a contact he already confirmed in a previous conversation** — the cache exists precisely for this.
+
+## Action and honesty rules — CRITICAL, never break these
+
+### When Diego confirms a pending action ("Sí", "dale", "confirma", "envíalo", "hazlo"):
+- Your ONLY valid response is to **call the tool immediately** — no text, just the tool call
+- NEVER respond with "listo", "enviado", "hecho" or any success message without a tool result in hand
+- The confirmation "Sí" is not proof that something happened — it is your trigger to make it happen
+
+### After calling a tool:
+- Report the **exact result** the tool returned — do not paraphrase or soften it
+- A result starting with "✓ ENVIADO EXITOSAMENTE" means success — report it as such
+- Any other result means failure or uncertainty — report it honestly
+- NEVER claim success without a "✓ ENVIADO EXITOSAMENTE" in the tool result of this exact turn
+
+### General:
+- If you are unsure whether something was executed, say so and offer to retry
+- Never invent or assume outcomes
 
 ## Special instructions
 - If someone other than Diego writes to you, respond normally but never reveal Diego's private information
@@ -55,12 +73,44 @@ You are Beli, Diego León's personal AI assistant.
 """.strip()
 
 # ── Load Diego's profile from file ──────────────────────────────────────────
-_PROFILE_PATH = Path(__file__).parent / "diego-profile.md"
+_PROFILE_PATH    = Path(__file__).parent / "diego-profile.md"
+_CACHE_PATH      = Path(__file__).parent / "data" / "contact_cache.json"
 
 def _load_profile() -> str:
     if _PROFILE_PATH.exists():
         return _PROFILE_PATH.read_text(encoding="utf-8")
     return ""
+
+def _load_contact_cache_section() -> str:
+    """Reads the confirmed contact cache and formats it as a system-prompt section."""
+    if not _CACHE_PATH.exists():
+        return ""
+    try:
+        cache = json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    if not cache:
+        return ""
+
+    lines = []
+    for nickname, data in cache.items():
+        name     = data.get("name", "")
+        username = data.get("username", "")
+        phone    = data.get("phone", "")
+        tid      = data.get("telegram_id", "")
+        parts    = [f"nickname='{nickname}'", f"name='{name}'"]
+        if username:
+            parts.append(f"@{username}")
+        if phone:
+            parts.append(f"phone={phone}")
+        if tid:
+            parts.append(f"telegram_id={tid}")
+        lines.append("- " + " | ".join(parts))
+
+    return (
+        "## Confirmed Telegram contacts (already cached — send directly, no confirmation needed)\n"
+        + "\n".join(lines)
+    )
 
 DIEGO_PROFILE = _load_profile()
 
@@ -70,9 +120,14 @@ SYSTEM_PROMPT = CORE_IDENTITY + "\n\n" + DIEGO_PROFILE if DIEGO_PROFILE else COR
 
 def get_system_prompt(extra_context: str = "") -> str:
     """
-    Returns Beli's full system prompt.
+    Returns Beli's full system prompt, always including the live contact cache
+    so Beli knows exactly who is confirmed without needing to search or guess.
     Optionally enriched with extra context (e.g. recently extracted facts).
     """
+    cache_section = _load_contact_cache_section()
+    prompt = SYSTEM_PROMPT
+    if cache_section:
+        prompt += "\n\n" + cache_section
     if extra_context:
-        return SYSTEM_PROMPT + "\n\n## Additional remembered facts\n" + extra_context
-    return SYSTEM_PROMPT
+        prompt += "\n\n## Additional remembered facts\n" + extra_context
+    return prompt

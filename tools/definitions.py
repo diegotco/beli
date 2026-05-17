@@ -28,10 +28,11 @@ TOOLS = [
         "name": "send_telegram_message",
         "description": (
             "Sends a Telegram message to a contact. "
-            "For contacts already in cache (previously confirmed by Diego), call this directly. "
-            "For new contacts, always call find_telegram_contact first, show Diego the result, "
-            "and only call this tool after Diego explicitly confirms the recipient is correct. "
-            "Pass the telegram_id returned by find_telegram_contact to guarantee the right person receives the message."
+            "ALWAYS try this tool first using just the nickname — if the contact was confirmed before, "
+            "it will send immediately without needing anything else. "
+            "Only call find_telegram_contact if this tool returns an error saying the contact is not found. "
+            "If you already know the @username (e.g. from a screenshot), pass it directly via the 'username' field — "
+            "no need to call find_telegram_contact at all."
         ),
         "input_schema": {
             "type": "object",
@@ -44,12 +45,19 @@ TOOLS = [
                     "type": "integer",
                     "description": "Telegram user ID returned by find_telegram_contact. Use when available.",
                 },
+                "username": {
+                    "type": "string",
+                    "description": (
+                        "Telegram @username of the recipient (e.g. '@hermes_de_diego_bot' or 'hermes_de_diego_bot'). "
+                        "Works for regular users AND bots. Use this whenever you know the @username — "
+                        "it is the most reliable identifier and does NOT require the person to be in Diego's contacts."
+                    ),
+                },
                 "contact_phone": {
                     "type": "string",
                     "description": (
                         "Phone number in international format (e.g. '+19293959561'). "
-                        "Use this when the contact has no @username and no telegram_id — "
-                        "Telethon can send messages via phone number if the person is in Diego's contacts."
+                        "Use this when the contact has no @username and no telegram_id."
                     ),
                 },
                 "message": {
@@ -63,24 +71,31 @@ TOOLS = [
     {
         "name": "send_email",
         "description": (
-            "Sends an email from Beli's own address (beli@agentmail.to) on Diego's behalf. "
-            "Use when Diego asks to send an email to someone. "
-            "Always confirm recipient, subject, and body with Diego before calling this tool."
+            "Sends an email from Beli's address (beli@agentmail.to) on Diego's behalf. "
+            "Use when Diego asks to send an email. "
+            "If Diego provides an email address directly in his message (e.g. 'envía un correo a foo@bar.com'), "
+            "use that address as `to` — do NOT ask who the recipient is. "
+            "If Diego mentions a contact name instead of an email, look it up in contacts.json. "
+            "Draft a subject and body based on Diego's instructions, show him the draft, and ask for confirmation before sending."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "to": {
                     "type": "string",
-                    "description": "Recipient email address.",
+                    "description": (
+                        "Recipient email address. "
+                        "Extract directly from Diego's message if he provides one (e.g. 'a diegotco@yahoo.com' → 'diegotco@yahoo.com'). "
+                        "If Diego gives a contact name, use their email from contacts.json."
+                    ),
                 },
                 "subject": {
                     "type": "string",
-                    "description": "Email subject line.",
+                    "description": "Email subject — infer from Diego's instructions if not explicitly stated.",
                 },
                 "body": {
                     "type": "string",
-                    "description": "Full email body text.",
+                    "description": "Full email body. Write it based on Diego's instructions.",
                 },
             },
             "required": ["to", "subject", "body"],

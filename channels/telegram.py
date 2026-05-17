@@ -25,6 +25,7 @@ from brain.claude_client import BelisBrain
 from memory.manager import MemoryManager
 from memory.extractor import FactExtractor
 from personality import get_system_prompt
+from channels.beli_listener import BeliListener
 
 logger = logging.getLogger("beli.telegram")
 
@@ -43,6 +44,7 @@ class TelegramChannel:
         reminder_hour: int = 9,
         reminder_minute: int = 0,
         reminder_days_before_end: int = 4,
+        beli_listener: BeliListener | None = None,
     ):
         self.token = token
         self.brain = brain
@@ -52,8 +54,25 @@ class TelegramChannel:
         self.reminder_hour = reminder_hour
         self.reminder_minute = reminder_minute
         self.reminder_days_before_end = reminder_days_before_end
-        self.app = Application.builder().token(token).build()
+        self.beli_listener = beli_listener
+        self.app = (
+            Application.builder()
+            .token(token)
+            .post_init(self._post_init)
+            .post_shutdown(self._post_shutdown)
+            .build()
+        )
         self._register_handlers()
+
+    async def _post_init(self, application: Application) -> None:
+        """Called once after the bot starts — launches Beli's Telegram listener."""
+        if self.beli_listener:
+            await self.beli_listener.start()
+
+    async def _post_shutdown(self, application: Application) -> None:
+        """Called once when the bot shuts down — stops the listener cleanly."""
+        if self.beli_listener:
+            await self.beli_listener.stop()
 
     def _register_handlers(self) -> None:
         """Registra todos los comandos y handlers de mensajes."""

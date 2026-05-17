@@ -51,13 +51,19 @@ class Config:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
-    # Telegram Bot (for Beli's chat interface)
+    # Telegram Bot (for Beli's chat interface with Diego)
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
-    # Telegram User API (for sending messages to contacts via Telethon)
-    # Get from: https://my.telegram.org/apps
+    # Telegram User API credentials (shared by both sessions)
     TELEGRAM_API_ID: int = int(os.getenv("TELEGRAM_API_ID", "0"))
     TELEGRAM_API_HASH: str = os.getenv("TELEGRAM_API_HASH", "")
+
+    # Diego's Telethon session — used only to search his contact list
+    DIEGO_SESSION_PATH: str = str(DATA_DIR / "telethon_session")
+
+    # Beli's own Telegram account — used to send & receive messages
+    BELI_TELEGRAM_PHONE: str = os.getenv("BELI_TELEGRAM_PHONE", "")
+    BELI_SESSION_PATH: str = str(DATA_DIR / "beli_session")
 
     # AgentMail (Beli's own email: beli@agentmail.to)
     AGENTMAIL_API_KEY: str = os.getenv("AGENTMAIL_API_KEY", "")
