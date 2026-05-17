@@ -404,11 +404,16 @@ class TelegramChannel:
 # ------------------------------------------------------------------
 
 def _load_reminders() -> str:
-    """Reads reminders.md and formats it as plain text for Telegram."""
-    path = Path(__file__).parent.parent / "reminders.md"
-    if not path.exists():
-        return ""
-    lines = path.read_text(encoding="utf-8").splitlines()
+    """Reads reminders: env var REMINDERS_CONTENT takes priority over local file."""
+    import os
+    env_content = os.getenv("REMINDERS_CONTENT", "").strip()
+    if env_content:
+        lines = env_content.splitlines()
+    else:
+        path = Path(__file__).parent.parent / "reminders.md"
+        if not path.exists():
+            return ""
+        lines = path.read_text(encoding="utf-8").splitlines()
     # Skip header/preamble lines; start from the first section heading
     output = []
     in_preamble = True

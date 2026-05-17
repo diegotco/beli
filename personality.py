@@ -1,10 +1,12 @@
 """
 personality.py - Defines Beli's identity, personality, and behavior.
 
-TO CUSTOMIZE: Edit owner-profile.md to update the owner's profile context.
+TO CUSTOMIZE: Edit owner-profile.md to update the owner's profile context,
+or set the OWNER_PROFILE environment variable (takes priority over the file).
 Edit CORE_IDENTITY below to change Beli's personality and communication style.
 """
 import json
+import os
 from pathlib import Path
 
 # ── Core identity: who Beli is and how she behaves ──────────────────────────
@@ -86,6 +88,10 @@ _PROFILE_PATH    = Path(__file__).parent / "owner-profile.md"
 _CACHE_PATH      = Path(__file__).parent / "data" / "contact_cache.json"
 
 def _load_profile() -> str:
+    """Load owner profile: env var takes priority over local file."""
+    env_profile = os.getenv("OWNER_PROFILE", "").strip()
+    if env_profile:
+        return env_profile
     if _PROFILE_PATH.exists():
         return _PROFILE_PATH.read_text(encoding="utf-8")
     return ""
