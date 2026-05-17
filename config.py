@@ -1,6 +1,6 @@
 """
-config.py - Carga y valida todas las configuraciones de Beli.
-Lee el archivo .env y expone un objeto Config con todos los ajustes.
+config.py - Loads and validates all of Beli's configuration.
+Reads the .env file and exposes a Config object with all settings.
 """
 import os
 import sys
@@ -8,11 +8,11 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Cargar variables del archivo .env
+# Load variables from the .env file
 load_dotenv()
 
 # ============================================================
-# CONFIGURACIÓN DE LOGGING
+# LOGGING SETUP
 # ============================================================
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -24,9 +24,9 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        # Mostrar en consola
+        # Print to console
         logging.StreamHandler(sys.stdout),
-        # Guardar en archivo
+        # Save to file
         logging.FileHandler(LOG_DIR / "beli.log", encoding="utf-8"),
     ],
 )
@@ -35,13 +35,13 @@ logger = logging.getLogger("beli.config")
 
 
 # ============================================================
-# CLASE DE CONFIGURACIÓN
+# CONFIGURATION CLASS
 # ============================================================
 
 class Config:
-    """Centraliza toda la configuración del proyecto."""
+    """Centralizes all project configuration."""
 
-    # Rutas del proyecto
+    # Project paths
     BASE_DIR = Path(__file__).parent
     DATA_DIR = BASE_DIR / "data"
     DATA_DIR.mkdir(exist_ok=True)
@@ -51,7 +51,7 @@ class Config:
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-haiku-4-5-20251001")
 
-    # Telegram Bot (for Beli's chat interface with the owner)
+    # Telegram Bot (chat interface between Beli and the owner)
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
     # Telegram User API credentials (shared by both sessions)
@@ -71,35 +71,35 @@ class Config:
     AGENTMAIL_API_KEY: str = os.getenv("AGENTMAIL_API_KEY", "")
     AGENTMAIL_INBOX_ID: str = os.getenv("AGENTMAIL_INBOX_ID", "beli")
 
-    # Memoria
+    # Memory
     MEMORY_WINDOW: int = int(os.getenv("MEMORY_WINDOW", "20"))
 
-    # Recordatorios mensuales
+    # Monthly reminders
     REMINDER_HOUR: int = int(os.getenv("REMINDER_HOUR", "9"))
     REMINDER_MINUTE: int = int(os.getenv("REMINDER_MINUTE", "0"))
     REMINDER_DAYS_BEFORE_END: int = int(os.getenv("REMINDER_DAYS_BEFORE_END", "4"))
 
     @classmethod
     def validate(cls) -> None:
-        """Verifica que todas las variables críticas estén configuradas."""
+        """Checks that all critical variables are configured."""
         errors = []
 
         if not cls.ANTHROPIC_API_KEY or cls.ANTHROPIC_API_KEY.startswith("sk-ant-xxx"):
-            errors.append("ANTHROPIC_API_KEY no está configurada en el archivo .env")
+            errors.append("ANTHROPIC_API_KEY is not set in the .env file")
 
         if not cls.TELEGRAM_BOT_TOKEN or cls.TELEGRAM_BOT_TOKEN.startswith("123456789"):
-            errors.append("TELEGRAM_BOT_TOKEN no está configurada en el archivo .env")
+            errors.append("TELEGRAM_BOT_TOKEN is not set in the .env file")
 
         if errors:
-            logger.error("=== ERRORES DE CONFIGURACIÓN ===")
+            logger.error("=== CONFIGURATION ERRORS ===")
             for err in errors:
                 logger.error(f"  ✗ {err}")
-            logger.error("Por favor edita el archivo .env con tus credenciales reales.")
+            logger.error("Please edit the .env file with your real credentials.")
             sys.exit(1)
 
-        logger.info("Configuración validada correctamente.")
-        logger.info(f"  Modelo Claude: {cls.CLAUDE_MODEL}")
-        logger.info(f"  Ventana de memoria: {cls.MEMORY_WINDOW} mensajes")
+        logger.info("Configuration validated successfully.")
+        logger.info(f"  Claude model: {cls.CLAUDE_MODEL}")
+        logger.info(f"  Memory window: {cls.MEMORY_WINDOW} messages")
 
 
 config = Config()

@@ -1,8 +1,8 @@
 """
-memory/manager.py - Gestión de memoria persistente de Beli usando SQLite.
+memory/manager.py - Beli's persistent memory management using SQLite.
 
-Guarda el historial de conversaciones y hechos importantes sobre cada usuario.
-La base de datos se crea automáticamente en data/beli_memory.db.
+Stores conversation history and important facts about each user.
+The database is created automatically at data/beli_memory.db.
 """
 import logging
 import aiosqlite
@@ -13,14 +13,14 @@ logger = logging.getLogger("beli.memory")
 
 
 class MemoryManager:
-    """Gestiona la memoria persistente entre conversaciones."""
+    """Manages persistent memory across conversations."""
 
     def __init__(self, db_path: Path, window_size: int = 20):
         self.db_path = str(db_path)
         self.window_size = window_size
 
     async def initialize(self) -> None:
-        """Crea las tablas de la base de datos si no existen."""
+        """Creates database tables if they do not exist."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS conversations (
@@ -57,18 +57,18 @@ class MemoryManager:
                     last_seen  TEXT DEFAULT (datetime('now'))
                 )
             """)
-            # Índice para acelerar búsquedas por usuario
+            # Index to speed up per-user lookups
             await db.execute("""
                 CREATE INDEX IF NOT EXISTS idx_conversations_user
                 ON conversations (channel, user_id, id)
             """)
             await db.commit()
-        logger.info(f"Base de datos inicializada en: {self.db_path}")
+        logger.info(f"Database initialized at: {self.db_path}")
 
     async def save_message(self, channel: str, user_id: str, role: str, content: str) -> None:
         """
-        Guarda un mensaje en el historial.
-        role: 'user' o 'assistant'
+        Saves a message to the conversation history.
+        role: 'user' or 'assistant'
         """
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -79,8 +79,8 @@ class MemoryManager:
 
     async def get_history(self, channel: str, user_id: str) -> list[dict]:
         """
-        Recupera los últimos N mensajes de un usuario para usarlos como contexto.
-        Devuelve lista de dicts con 'role' y 'content' (formato Claude API).
+        Retrieves the last N messages for a user to use as context.
+        Returns a list of dicts with 'role' and 'content' (Claude API format).
         """
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -99,21 +99,21 @@ class MemoryManager:
                 rows = await cursor.fetchall()
 
         history = [{"role": row["role"], "content": row["content"]} for row in rows]
-        logger.debug(f"Historial cargado para {channel}/{user_id}: {len(history)} mensajes")
+        logger.debug(f"History loaded for {channel}/{user_id}: {len(history)} messages")
         return history
 
     async def save_fact(self, channel: str, user_id: str, fact: str) -> None:
-        """Guarda un hecho importante sobre el usuario para recordarlo siempre."""
+        """Saves an important fact about the user for permanent recall."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO user_facts (channel, user_id, fact) VALUES (?, ?, ?)",
                 (channel, str(user_id), fact),
             )
             await db.commit()
-        logger.info(f"Hecho guardado para {channel}/{user_id}: {fact}")
+        logger.info(f"Fact saved for {channel}/{user_id}: {fact}")
 
     async def get_facts(self, channel: str, user_id: str) -> list[str]:
-        """Recupera todos los hechos guardados de un usuario."""
+        """Retrieves all saved facts for a user."""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -124,7 +124,7 @@ class MemoryManager:
         return [row["fact"] for row in rows]
 
     async def get_messages_since(self, channel: str, user_id: str, after_id: int) -> list[dict]:
-        """Devuelve los mensajes con id mayor a after_id (para extracción de hechos)."""
+        """Returns messages with id greater than after_id (used for fact extraction)."""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -139,7 +139,7 @@ class MemoryManager:
         return [{"id": row["id"], "role": row["role"], "content": row["content"]} for row in rows]
 
     async def get_all_active_users(self) -> list[tuple[str, str]]:
-        """Devuelve todos los pares (channel, user_id) que tienen conversaciones."""
+        """Returns all (channel, user_id) pairs that have conversations."""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -149,7 +149,7 @@ class MemoryManager:
         return [(row["channel"], row["user_id"]) for row in rows]
 
     async def get_extraction_checkpoint(self, channel: str, user_id: str) -> int:
-        """Devuelve el id del último mensaje ya procesado para extracción. 0 si nunca se procesó."""
+        """Returns the id of the last message already processed for extraction. 0 if never processed."""
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -160,7 +160,7 @@ class MemoryManager:
         return row["last_message_id"] if row else 0
 
     async def save_extraction_checkpoint(self, channel: str, user_id: str, last_message_id: int) -> None:
-        """Guarda el id del último mensaje procesado para no reprocesarlo."""
+        """Saves the id of the last processed message to avoid reprocessing it."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 """
@@ -175,7 +175,7 @@ class MemoryManager:
             await db.commit()
 
     async def fact_exists(self, channel: str, user_id: str, fact: str) -> bool:
-        """Verifica si un hecho muy similar ya está guardado (evita duplicados exactos)."""
+        """Checks if a very similar fact is already saved (avoids exact duplicates)."""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute(
                 "SELECT 1 FROM user_facts WHERE channel = ? AND user_id = ? AND fact = ?",
@@ -204,7 +204,7 @@ class MemoryManager:
         return [row["chat_id"] for row in rows]
 
     async def clear_history(self, channel: str, user_id: str) -> int:
-        """Borra el historial de conversación de un usuario. Devuelve cuántos mensajes se borraron."""
+        """Clears a user's conversation history. Returns the number of messages deleted."""
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute(
                 "DELETE FROM conversations WHERE channel = ? AND user_id = ?",
@@ -212,5 +212,5 @@ class MemoryManager:
             )
             await db.commit()
             count = cursor.rowcount
-        logger.info(f"Historial borrado para {channel}/{user_id}: {count} mensajes eliminados")
+        logger.info(f"History cleared for {channel}/{user_id}: {count} messages deleted")
         return count

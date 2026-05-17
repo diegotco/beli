@@ -1,8 +1,8 @@
 """
-channels/telegram.py - Módulo de Telegram para Beli.
+channels/telegram.py - Telegram module for Beli.
 
-Conecta Beli a Telegram usando python-telegram-bot.
-Maneja mensajes entrantes, los pasa al cerebro y devuelve la respuesta.
+Connects Beli to Telegram using python-telegram-bot.
+Handles incoming messages, passes them to the brain, and returns the response.
 """
 import base64
 import calendar
@@ -33,7 +33,7 @@ CHANNEL = "telegram"
 
 
 class TelegramChannel:
-    """Bot de Telegram para Beli."""
+    """Beli's Telegram bot."""
 
     def __init__(
         self,
@@ -75,7 +75,7 @@ class TelegramChannel:
             await self.beli_listener.stop()
 
     def _register_handlers(self) -> None:
-        """Registra todos los comandos y handlers de mensajes."""
+        """Registers all command and message handlers."""
         self.app.add_handler(CommandHandler("start", self._cmd_start))
         self.app.add_handler(CommandHandler("borrar", self._cmd_clear))
         self.app.add_handler(CommandHandler("ayuda", self._cmd_help))
@@ -100,19 +100,19 @@ class TelegramChannel:
         self.app.add_handler(
             MessageHandler(filters.PHOTO, self._handle_photo)
         )
-        # Handler de errores global
+        # Global error handler
         self.app.add_error_handler(self._error_handler)
-        logger.info("Handlers de Telegram registrados.")
+        logger.info("Telegram handlers registered.")
 
     # ------------------------------------------------------------------
-    # COMANDOS
+    # COMMANDS
     # ------------------------------------------------------------------
 
     async def _cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Saludo inicial cuando el usuario envía /start."""
+        """Initial greeting when the user sends /start."""
         user = update.effective_user
         user_id = str(user.id)
-        logger.info(f"Usuario nuevo en Telegram: {user.full_name} (id={user_id})")
+        logger.info(f"New user on Telegram: {user.full_name} (id={user_id})")
 
         welcome = (
             f"Hola {user.first_name} 👋 Soy Beli, tu asistente personal.\n\n"
@@ -124,7 +124,7 @@ class TelegramChannel:
         await update.message.reply_text(welcome)
 
     async def _cmd_clear(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Borra el historial de conversación del usuario."""
+        """Clears the user's conversation history."""
         user_id = str(update.effective_user.id)
         count = await self.memory.clear_history(CHANNEL, user_id)
         await update.message.reply_text(
@@ -132,7 +132,7 @@ class TelegramChannel:
         )
 
     async def _cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Muestra la ayuda."""
+        """Shows the help message."""
         help_text = (
             "Soy Beli, tu asistente personal con IA.\n\n"
             "Comandos:\n"
@@ -165,7 +165,7 @@ class TelegramChannel:
         await update.message.reply_text(f"Contactos guardados en caché:\n\n{lines}")
 
     async def _cmd_memory(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Muestra los hechos guardados sobre el usuario."""
+        """Shows the saved facts about the user."""
         user_id = str(update.effective_user.id)
         facts = await self.memory.get_facts(CHANNEL, user_id)
         if not facts:
@@ -178,52 +178,52 @@ class TelegramChannel:
             await update.message.reply_text(f"Esto es lo que recuerdo sobre ti:\n\n{lines}")
 
     # ------------------------------------------------------------------
-    # MENSAJES
+    # MESSAGES
     # ------------------------------------------------------------------
 
     async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Procesa un mensaje de texto entrante y responde con Beli."""
+        """Processes an incoming text message and replies with Beli's response."""
         user = update.effective_user
         user_id = str(user.id)
         user_name = user.full_name or user.username or user_id
         text = update.message.text
 
-        logger.info(f"Mensaje de {user_name} (id={user_id}): {text[:80]}{'...' if len(text) > 80 else ''}")
+        logger.info(f"Message from {user_name} (id={user_id}): {text[:80]}{'...' if len(text) > 80 else ''}")
 
         # Register chat_id so Beli can send proactive messages (e.g. reminders)
         await self.memory.register_telegram_chat(update.effective_chat.id)
 
-        # Mostrar indicador "escribiendo..." mientras Beli procesa
+        # Show "typing..." indicator while Beli processes
         await update.message.chat.send_action(ChatAction.TYPING)
 
-        # Cargar historial y hechos del usuario
+        # Load user history and facts
         history = await self.memory.get_history(CHANNEL, user_id)
         facts = await self.memory.get_facts(CHANNEL, user_id)
         extra_context = "\n".join(f"- {f}" for f in facts) if facts else ""
 
-        # Construir system prompt enriquecido con contexto del usuario
+        # Build system prompt enriched with user context
         system = get_system_prompt(extra_context)
 
-        # Pedir respuesta al cerebro (Claude)
+        # Ask the brain (Claude) for a response
         response = await self.brain.think(
             system_prompt=system,
             history=history,
             new_message=text,
         )
 
-        # Guardar ambos mensajes en memoria
+        # Save both messages to memory
         await self.memory.save_message(CHANNEL, user_id, "user", text)
         await self.memory.save_message(CHANNEL, user_id, "assistant", response)
 
-        # Enviar respuesta (Telegram tiene límite de 4096 caracteres por mensaje)
+        # Send response (Telegram has a 4096-character limit per message)
         if len(response) <= 4096:
             await update.message.reply_text(response)
         else:
-            # Dividir respuestas largas en múltiples mensajes
+            # Split long responses into multiple messages
             for chunk in _split_text(response, 4096):
                 await update.message.reply_text(chunk)
 
-        logger.info(f"Respuesta enviada a {user_name}: {response[:80]}{'...' if len(response) > 80 else ''}")
+        logger.info(f"Response sent to {user_name}: {response[:80]}{'...' if len(response) > 80 else ''}")
 
     async def _handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Processes an image sent by the owner — passes it to Claude's vision."""
@@ -269,7 +269,7 @@ class TelegramChannel:
                 await update.message.reply_text(chunk)
 
     # ------------------------------------------------------------------
-    # ERROR HANDLER
+    # JOBS & ERROR HANDLER
     # ------------------------------------------------------------------
 
     async def _job_extract_facts(self, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -281,7 +281,7 @@ class TelegramChannel:
             logger.exception(f"Error in fact extraction job: {e}")
 
     async def _job_monthly_reminder(self, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Daily job: sends subscription reminders 4 days before end of month."""
+        """Daily job: sends subscription reminders N days before end of month."""
         today = datetime.date.today()
         last_day = calendar.monthrange(today.year, today.month)[1]
         days_remaining = last_day - today.day
@@ -319,24 +319,24 @@ class TelegramChannel:
                 logger.error(f"Failed to send reminder to chat_id={chat_id}: {e}")
 
     async def _error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Registra errores no manejados del bot."""
-        logger.error(f"Error no manejado en Telegram: {context.error}", exc_info=context.error)
+        """Logs unhandled errors from the bot."""
+        logger.error(f"Unhandled Telegram error: {context.error}", exc_info=context.error)
 
     # ------------------------------------------------------------------
-    # INICIO
+    # START
     # ------------------------------------------------------------------
 
     def run(self) -> None:
-        """Inicia el bot en modo polling (para uso local)."""
-        logger.info("Iniciando Beli en Telegram (modo polling)...")
+        """Starts the bot in polling mode (for local use)."""
+        logger.info("Starting Beli on Telegram (polling mode)...")
         self.app.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,  # Ignorar mensajes acumulados mientras estaba apagado
+            drop_pending_updates=True,  # Ignore messages that accumulated while offline
         )
 
 
 # ------------------------------------------------------------------
-# UTILIDADES
+# UTILITIES
 # ------------------------------------------------------------------
 
 def _load_reminders() -> str:
@@ -345,7 +345,7 @@ def _load_reminders() -> str:
     if not path.exists():
         return ""
     lines = path.read_text(encoding="utf-8").splitlines()
-    # Strip header/meta lines (lines starting with #! or the preamble block)
+    # Skip header/preamble lines; start from the first section heading
     output = []
     in_preamble = True
     for line in lines:
@@ -359,7 +359,7 @@ def _load_reminders() -> str:
 
 
 def _split_text(text: str, max_length: int) -> list[str]:
-    """Divide texto largo en fragmentos respetando párrafos."""
+    """Splits long text into chunks respecting paragraph boundaries."""
     chunks = []
     while len(text) > max_length:
         split_at = text.rfind("\n", 0, max_length)

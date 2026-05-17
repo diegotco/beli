@@ -1,7 +1,7 @@
 """
-main.py - Punto de entrada de Beli.
+main.py - Entry point for Beli.
 
-Ejecutar con:  python main.py
+Run with:  python main.py
 """
 import asyncio
 import logging
@@ -17,22 +17,22 @@ logger = logging.getLogger("beli.main")
 
 
 async def startup() -> None:
-    """Inicializa los componentes de Beli antes de arrancar."""
+    """Initializes Beli's components before starting."""
     logger.info("=" * 50)
-    logger.info("  Iniciando Beli — Asistente Personal de IA")
+    logger.info("  Starting Beli — Personal AI Assistant")
     logger.info("=" * 50)
 
-    # Validar que todas las credenciales estén configuradas
+    # Validate that all required credentials are configured
     config.validate()
 
-    # Inicializar base de datos de memoria
+    # Initialize memory database
     memory = MemoryManager(
         db_path=config.DB_PATH,
         window_size=config.MEMORY_WINDOW,
     )
     await memory.initialize()
 
-    # Inicializar el cerebro (Claude)
+    # Initialize the brain (Claude)
     brain = BelisBrain(
         api_key=config.ANTHROPIC_API_KEY,
         model=config.CLAUDE_MODEL,
@@ -42,8 +42,8 @@ async def startup() -> None:
 
 
 def main() -> None:
-    """Arranca Beli con todos los canales configurados."""
-    # Inicializar componentes async
+    """Starts Beli with all configured channels."""
+    # Initialize async components
     loop = asyncio.new_event_loop()
     memory, brain = loop.run_until_complete(startup())
     loop.close()
@@ -62,7 +62,7 @@ def main() -> None:
     else:
         logger.warning("BELI_TELEGRAM_PHONE not set — incoming message listener disabled.")
 
-    # Iniciar canal Telegram
+    # Start the Telegram channel
     telegram = TelegramChannel(
         token=config.TELEGRAM_BOT_TOKEN,
         brain=brain,
@@ -73,7 +73,7 @@ def main() -> None:
         beli_listener=beli_listener,
     )
 
-    logger.info("Beli está lista. Esperando mensajes en Telegram...")
+    logger.info("Beli is ready. Waiting for messages on Telegram...")
     telegram.run()
 
 

@@ -24,29 +24,29 @@ SESSION  = str(Path(__file__).parent / "data" / "beli_session")
 
 async def main():
     if not API_ID or not API_HASH:
-        print("ERROR: TELEGRAM_API_ID y TELEGRAM_API_HASH deben estar en el .env")
+        print("ERROR: TELEGRAM_API_ID and TELEGRAM_API_HASH must be set in your .env file")
         sys.exit(1)
 
     print("=" * 55)
-    print("  Setup de la cuenta de Telegram de Beli")
+    print("  Beli Telegram Account Setup")
     print("=" * 55)
-    print("Ingresa el número mexicano de Beli (formato: +521XXXXXXXXXX):")
-    phone = input("  Teléfono: ").strip()
+    print("Enter Beli's phone number in international format (e.g. +1XXXXXXXXXX):")
+    phone = input("  Phone: ").strip()
 
     async with TelegramClient(SESSION, API_ID, API_HASH) as client:
         await client.start(phone=phone)
 
         me = await client.get_me()
-        print(f"\n✓ Sesión iniciada como: {me.first_name} {me.last_name or ''} (@{me.username or 'sin username'})")
+        print(f"\n✓ Session started as: {me.first_name} {me.last_name or ''} (@{me.username or 'no username'})")
 
         # Optionally update the profile name to "Beli"
-        update = input("\n¿Actualizar el nombre del perfil a 'Beli'? (s/n): ").strip().lower()
-        if update == "s":
+        update = input("\nUpdate the profile name to 'Beli'? (y/n): ").strip().lower()
+        if update == "y":
             await client(UpdateProfileRequest(first_name="Beli", last_name=""))
-            print("✓ Nombre actualizado a 'Beli'")
+            print("✓ Name updated to 'Beli'")
 
-        print("\n✓ Sesión guardada en data/beli_session.session")
-        print("✓ Ya puedes agregar BELI_TELEGRAM_PHONE al .env y reiniciar Beli")
+        print("\n✓ Session saved to data/beli_session.session")
+        print("✓ You can now add BELI_TELEGRAM_PHONE to your .env and restart Beli")
 
 
 if __name__ == "__main__":

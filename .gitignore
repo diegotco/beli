@@ -1,7 +1,7 @@
 # Variables de entorno (NUNCA subir a git)
 .env
 
-# Perfil personal del dueño (contiene información privada)
+# Owner's personal profile (contains private information)
 owner-profile.md
 *-profile.md
 

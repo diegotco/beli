@@ -59,7 +59,7 @@ class BelisBrain:
     def __init__(self, api_key: str, model: str):
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
-        logger.info(f"Beli's brain initialized with model: {model}")
+        logger.info(f"Brain initialized with model: {model}")
 
     async def think_with_image(
         self,
