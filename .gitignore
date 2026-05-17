@@ -1,6 +1,9 @@
 # Variables de entorno (NUNCA subir a git)
 .env
 
+# Perfil personal (contiene información privada)
+diego-profile.md
+
 # Data folder — all generated/sensitive files
 data/*.db
 data/*.session
