@@ -7,6 +7,7 @@ immediately via the bot with the sender's name and message content.
 import logging
 
 from telethon import TelegramClient, events
+from telethon.sessions import StringSession
 from telegram import Bot
 from tools.telegram_sender import set_shared_beli_client
 
@@ -27,7 +28,9 @@ class BeliListener:
         bot: Bot,
         memory,
     ):
-        self.client  = TelegramClient(session_path, api_id, api_hash)
+        from config import config
+        session = StringSession(config.BELI_SESSION_STRING) if config.BELI_SESSION_STRING else session_path
+        self.client  = TelegramClient(session, api_id, api_hash)
         self.bot     = bot
         self.memory  = memory
 

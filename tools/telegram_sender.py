@@ -13,6 +13,7 @@ import datetime
 
 from telethon import TelegramClient
 from telethon.errors import FloodWaitError, UsernameNotOccupiedError
+from telethon.sessions import StringSession
 from telethon.tl.functions.contacts import GetContactsRequest, ImportContactsRequest
 from telethon.tl.types import InputPhoneContact, User, Channel, Chat
 
@@ -25,6 +26,18 @@ _CACHE_PATH         = Path(__file__).parent.parent / "data" / "contact_cache.jso
 # Shared Beli client — set by BeliListener on startup so send_telegram_message
 # reuses the already-open connection instead of creating a second one.
 _shared_beli_client = None
+
+def _diego_client(api_id: int, api_hash: str) -> TelegramClient:
+    """Returns a TelegramClient for Diego's account (StringSession in cloud, file locally)."""
+    from config import config
+    session = StringSession(config.DIEGO_SESSION_STRING) if config.DIEGO_SESSION_STRING else _DIEGO_SESSION_PATH
+    return TelegramClient(session, api_id, api_hash)
+
+def _beli_client(api_id: int, api_hash: str) -> TelegramClient:
+    """Returns a TelegramClient for Beli's account (StringSession in cloud, file locally)."""
+    from config import config
+    session = StringSession(config.BELI_SESSION_STRING) if config.BELI_SESSION_STRING else _BELI_SESSION_PATH
+    return TelegramClient(session, api_id, api_hash)
 
 def set_shared_beli_client(client) -> None:
     global _shared_beli_client
@@ -86,7 +99,7 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
 
     # ── Live search via Telegram API (uses Diego's session = his contact list) ─
     try:
-        async with TelegramClient(_DIEGO_SESSION_PATH, api_id, api_hash) as client:
+        async with _diego_client(api_id, api_hash) as client:
             result = await client(GetContactsRequest(hash=0))
             all_contacts = result.users
             search = name.lower().strip()
@@ -237,7 +250,7 @@ async def send_telegram_message(
             logger.info("Using shared Beli client for sending.")
             return await _do_send(_shared_beli_client)
         else:
-            async with TelegramClient(_BELI_SESSION_PATH, api_id, api_hash) as client:
+            async with _beli_client(api_id, api_hash) as client:
                 return await _do_send(client)
 
     except FloodWaitError as e:
@@ -258,7 +271,7 @@ async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str
     logger.info(f"Reading {limit} most recent Telegram chats for Diego.")
 
     try:
-        async with TelegramClient(_DIEGO_SESSION_PATH, api_id, api_hash) as client:
+        async with _diego_client(api_id, api_hash) as client:
             dialogs = await client.get_dialogs(limit=limit)
             if not dialogs:
                 return "No encontré conversaciones recientes en Telegram."
@@ -307,7 +320,7 @@ async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: i
     logger.info(f"Reading chat history for '{chat_name}' (last {limit} messages).")
 
     try:
-        async with TelegramClient(_DIEGO_SESSION_PATH, api_id, api_hash) as client:
+        async with _diego_client(api_id, api_hash) as client:
             # Find the dialog by name
             search = chat_name.lower().strip()
             target = None
