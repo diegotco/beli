@@ -1,8 +1,11 @@
 """
 channels/beli_listener.py - Listens for incoming messages on Beli's own Telegram account.
 
-When someone replies to Beli or starts a conversation with her, the owner is notified
-immediately via the bot with the sender's name and message content.
+When someone writes to @BeliAgent:
+  1. An automatic acknowledgment is sent back to the contact
+  2. The owner is notified via the bot with a reply hint
+  3. If the contact keeps insisting, a polite deflection is sent once
+  4. The owner can reply by telling @IamBeliBot: "respóndele a [name]: [message]"
 """
 import logging
 
@@ -10,13 +13,14 @@ from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from telegram import Bot
 from tools.telegram_sender import set_shared_beli_client
+from channels.contact_handler import ContactHandler
 
 logger = logging.getLogger("beli.listener")
 
 
 class BeliListener:
     """
-    Keeps Beli's Telethon session open and forwards incoming messages to the owner.
+    Keeps Beli's Telethon session open and handles incoming messages from external contacts.
     Lifecycle: call start() when the bot starts, stop() when it shuts down.
     """
 
@@ -33,6 +37,7 @@ class BeliListener:
         self.client  = TelegramClient(session, api_id, api_hash)
         self.bot     = bot
         self.memory  = memory
+        self.contact_handler = ContactHandler()
 
     async def start(self) -> None:
         await self.client.start()
@@ -54,24 +59,35 @@ class BeliListener:
 
             first    = getattr(sender, "first_name", "") or ""
             last     = getattr(sender, "last_name",  "") or ""
-            name     = f"{first} {last}".strip() or "Desconocido"
-            username = f" (@{sender.username})" if getattr(sender, "username", None) else ""
-            text     = event.text or "[mensaje sin texto]"
+            name     = f"{first} {last}".strip() or "Unknown"
+            username = getattr(sender, "username", "") or ""
+            tid      = getattr(sender, "id", None)
+            text     = event.text or "[non-text message]"
 
-            logger.info(f"Incoming → Beli from {name}{username}: {text[:80]}")
-
-            notify = (
-                f"📨 *{name}{username}* le respondió a Beli:\n\n"
-                f"{text}"
+            # Process through the channel-agnostic contact handler
+            reply_text, owner_notification = self.contact_handler.process(
+                sender_id=str(tid or name),
+                sender_name=name,
+                sender_username=username,
+                sender_telegram_id=tid,
+                text=text,
+                channel="Telegram",
             )
 
+            # Send auto-reply to the contact if needed (acknowledgment or deflection)
+            if reply_text:
+                await event.reply(reply_text)
+                logger.info(f"Auto-reply sent to {name}: {reply_text[:60]}...")
+
+            # Notify the owner via the bot
             chat_ids = await self.memory.get_telegram_chat_ids()
             for chat_id in chat_ids:
                 await self.bot.send_message(
                     chat_id=chat_id,
-                    text=notify,
+                    text=owner_notification,
                     parse_mode="Markdown",
                 )
+
         except Exception as e:
             logger.exception(f"Error handling incoming message for Beli: {e}")
 
