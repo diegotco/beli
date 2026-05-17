@@ -1,0 +1,6 @@
+{
+  "_info": "This file is ONLY needed for email addresses. Telegram contacts are found automatically from your real contact list.",
+  "_instructions": "Copy this file to contacts.json and fill in the email addresses for your contacts.",
+  "friend_nickname": { "email": "friend@example.com" },
+  "family_nickname": { "email": "family@example.com" }
+}

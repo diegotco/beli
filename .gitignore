@@ -11,6 +11,10 @@ data/*.session
 data/contact_cache.json
 data/beli_session.session
 
+# Personal files — use the .example versions as templates
+contacts.json
+reminders.md
+
 # Logs
 logs/*.log
 
