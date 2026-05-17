@@ -166,7 +166,7 @@ async def send_telegram_message(
     Sends a Telegram message using:
     - telegram_id (int): direct Telegram user ID
     - username (str): @username, works for users AND bots (e.g. '@some_bot')
-    - contact_phone (str): phone in international format e.g. '+19293959561'
+    - contact_phone (str): phone in international format e.g. '+15550001234'
     - nickname only: looks up in cache
     """
     cache = _load_cache()

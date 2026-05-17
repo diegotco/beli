@@ -54,7 +54,7 @@ TOOLS = [
                 "contact_phone": {
                     "type": "string",
                     "description": (
-                        "Phone number in international format (e.g. '+19293959561'). "
+                        "Phone number in international format (e.g. '+15550001234'). "
                         "Use this when the contact has no @username and no telegram_id."
                     ),
                 },
