@@ -103,7 +103,7 @@ Beli is running! Now:
 
 To change how she talks, her name, or her instructions:
 - Open `personality.py` and edit `CORE_IDENTITY`
-- To update your personal profile and context, edit `diego-profile.md`
+- To update your personal profile and context, edit `owner-profile.md`
 - Save and restart Beli (`Ctrl+C` to stop, then `python3 main.py` again)
 
 ---
@@ -145,7 +145,7 @@ beli/
 ├── main.py                ← Entry point. Run this.
 ├── config.py              ← Reads .env and validates credentials
 ├── personality.py         ← Beli's identity and behavior logic
-├── diego-profile.md       ← Diego's personal profile (edit this to update context)
+├── owner-profile.md       ← Owner's personal profile (edit this to update context)
 ├── requirements.txt       ← Python libraries
 ├── .env                   ← YOUR CREDENTIALS (never share)
 │

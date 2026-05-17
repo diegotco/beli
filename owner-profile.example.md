@@ -1,7 +1,7 @@
 # Your Name's Master Profile for Beli
 
 This document contains the main context that Beli uses to help you in a personalized way.
-Copy this file to `diego-profile.md` (gitignored) and fill it with your real information.
+Copy this file to `owner-profile.md` (gitignored) and fill it with your real information.
 
 ---
 

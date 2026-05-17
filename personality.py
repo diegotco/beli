@@ -1,7 +1,7 @@
 """
 personality.py - Defines Beli's identity, personality, and behavior.
 
-TO CUSTOMIZE: Edit diego-profile.md to update Diego's profile context.
+TO CUSTOMIZE: Edit owner-profile.md to update the owner's profile context.
 Edit CORE_IDENTITY below to change Beli's personality and communication style.
 """
 import json
@@ -73,7 +73,7 @@ You are Beli, Diego León's personal AI assistant.
 """.strip()
 
 # ── Load Diego's profile from file ──────────────────────────────────────────
-_PROFILE_PATH    = Path(__file__).parent / "diego-profile.md"
+_PROFILE_PATH    = Path(__file__).parent / "owner-profile.md"
 _CACHE_PATH      = Path(__file__).parent / "data" / "contact_cache.json"
 
 def _load_profile() -> str:
