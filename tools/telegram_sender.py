@@ -9,10 +9,12 @@ import json
 import logging
 from pathlib import Path
 
+import datetime
+
 from telethon import TelegramClient
 from telethon.errors import FloodWaitError, UsernameNotOccupiedError
 from telethon.tl.functions.contacts import GetContactsRequest, ImportContactsRequest
-from telethon.tl.types import InputPhoneContact
+from telethon.tl.types import InputPhoneContact, User, Channel, Chat
 
 logger = logging.getLogger("beli.tools.telegram_sender")
 
@@ -243,3 +245,117 @@ async def send_telegram_message(
     except Exception as e:
         logger.exception(f"Error sending message ({identifier}): {e}")
         return f"Error al enviar el mensaje: {e}"
+
+
+# ── Tool 3: Read recent chats (overview) ────────────────────────────────────
+
+async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str:
+    """
+    Reads Diego's most recent Telegram conversations using his own session.
+    Returns a human-readable summary of each chat with sender, preview, and time.
+    """
+    limit = min(max(1, limit), 20)
+    logger.info(f"Reading {limit} most recent Telegram chats for Diego.")
+
+    try:
+        async with TelegramClient(_DIEGO_SESSION_PATH, api_id, api_hash) as client:
+            dialogs = await client.get_dialogs(limit=limit)
+            if not dialogs:
+                return "No encontré conversaciones recientes en Telegram."
+
+            lines = []
+            for i, dialog in enumerate(dialogs, 1):
+                entity = dialog.entity
+
+                # Determine chat name
+                if isinstance(entity, User):
+                    name = f"{entity.first_name or ''} {entity.last_name or ''}".strip()
+                    if entity.username:
+                        name += f" (@{entity.username})"
+                elif isinstance(entity, (Channel, Chat)):
+                    name = getattr(entity, "title", "Grupo/Canal")
+                else:
+                    name = "Desconocido"
+
+                # Last message preview
+                msg = dialog.message
+                if msg and msg.text:
+                    preview = msg.text[:80] + ("…" if len(msg.text) > 80 else "")
+                    sender = "Tú" if msg.out else name.split("(")[0].strip()
+                    unread = f" [{dialog.unread_count} sin leer]" if dialog.unread_count else ""
+                    # Format timestamp
+                    ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+                    lines.append(f"{i}. **{name}**{unread} — {ts}\n   {sender}: {preview}")
+                else:
+                    lines.append(f"{i}. **{name}** — (sin mensajes de texto)")
+
+            return "Tus últimas conversaciones en Telegram:\n\n" + "\n\n".join(lines)
+
+    except Exception as e:
+        logger.exception(f"Error reading Telegram chats: {e}")
+        return f"Error al leer los chats de Telegram: {e}"
+
+
+# ── Tool 4: Read full history of a specific chat ─────────────────────────────
+
+async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: int = 30) -> str:
+    """
+    Reads the recent message history of a specific Telegram chat by name.
+    Returns formatted messages with sender, timestamp, and content.
+    """
+    limit = min(max(1, limit), 100)
+    logger.info(f"Reading chat history for '{chat_name}' (last {limit} messages).")
+
+    try:
+        async with TelegramClient(_DIEGO_SESSION_PATH, api_id, api_hash) as client:
+            # Find the dialog by name
+            search = chat_name.lower().strip()
+            target = None
+            async for dialog in client.iter_dialogs():
+                entity = dialog.entity
+                if isinstance(entity, User):
+                    name = f"{entity.first_name or ''} {entity.last_name or ''}".strip()
+                    username = entity.username or ""
+                elif isinstance(entity, (Channel, Chat)):
+                    name = getattr(entity, "title", "")
+                    username = getattr(entity, "username", "") or ""
+                else:
+                    continue
+
+                if search in name.lower() or search in username.lower():
+                    target = dialog
+                    break
+
+            if not target:
+                return f"No encontré ninguna conversación llamada '{chat_name}' en Telegram."
+
+            # Fetch messages
+            messages = []
+            async for msg in client.iter_messages(target.entity, limit=limit):
+                if not msg.text:
+                    continue
+                ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+                if msg.out:
+                    sender = "Diego"
+                else:
+                    entity = target.entity
+                    if isinstance(entity, User):
+                        sender = f"{entity.first_name or ''}".strip() or "Contacto"
+                    else:
+                        # Group: try to get sender name
+                        if msg.sender:
+                            sender = f"{getattr(msg.sender, 'first_name', '') or ''}".strip() or "Miembro"
+                        else:
+                            sender = "Miembro"
+                messages.append(f"[{ts}] {sender}: {msg.text}")
+
+            if not messages:
+                return f"No encontré mensajes de texto en la conversación con '{chat_name}'."
+
+            messages.reverse()  # Chronological order
+            header = f"Últimos {len(messages)} mensajes de '{chat_name}':\n\n"
+            return header + "\n".join(messages)
+
+    except Exception as e:
+        logger.exception(f"Error reading chat history for '{chat_name}': {e}")
+        return f"Error al leer el historial de '{chat_name}': {e}"

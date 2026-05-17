@@ -69,6 +69,46 @@ TOOLS = [
         },
     },
     {
+        "name": "read_telegram_chats",
+        "description": (
+            "Reads Diego's most recent Telegram conversations and returns a summary. "
+            "Use this when Diego asks to check, review, or summarize his Telegram chats. "
+            "Returns the sender name, last message, and timestamp for each chat."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of recent chats to read (default 5, max 20).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "read_chat_history",
+        "description": (
+            "Reads the recent message history of a specific Telegram chat or contact. "
+            "Use this when Diego asks to summarize, review, or search messages inside a specific conversation. "
+            "Search by the contact or group name."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "chat_name": {
+                    "type": "string",
+                    "description": "Name of the contact or group to read (e.g. 'OTC Financial Markets', 'Alanis').",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of recent messages to fetch (default 30, max 100).",
+                },
+            },
+            "required": ["chat_name"],
+        },
+    },
+    {
         "name": "send_email",
         "description": (
             "Sends an email from Beli's address (beli@agentmail.to) on Diego's behalf. "

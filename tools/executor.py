@@ -5,7 +5,7 @@ import asyncio
 import logging
 from functools import partial
 from config import config
-from tools.telegram_sender import find_telegram_contact, send_telegram_message
+from tools.telegram_sender import find_telegram_contact, send_telegram_message, read_telegram_chats, read_chat_history
 from tools.email_sender import send_email
 
 logger = logging.getLogger("beli.tools.executor")
@@ -45,6 +45,21 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
                 subject=tool_input.get("subject", ""),
                 body=tool_input.get("body", ""),
             ),
+        )
+
+    if tool_name == "read_chat_history":
+        return await read_chat_history(
+            api_id=config.TELEGRAM_API_ID,
+            api_hash=config.TELEGRAM_API_HASH,
+            chat_name=tool_input.get("chat_name", ""),
+            limit=tool_input.get("limit", 30),
+        )
+
+    if tool_name == "read_telegram_chats":
+        return await read_telegram_chats(
+            api_id=config.TELEGRAM_API_ID,
+            api_hash=config.TELEGRAM_API_HASH,
+            limit=tool_input.get("limit", 5),
         )
 
     logger.warning(f"Unknown tool called: {tool_name}")
