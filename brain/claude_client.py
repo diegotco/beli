@@ -85,7 +85,7 @@ class BelisBrain:
                 },
                 {
                     "type": "text",
-                    "text": caption or "Diego envió esta imagen.",
+                    "text": caption or "El propietario envió esta imagen.",
                 },
             ],
         }
@@ -110,7 +110,7 @@ class BelisBrain:
         Args:
             system_prompt: Beli's personality and context
             history: Previous messages [{"role": "user/assistant", "content": "..."}]
-            new_message: The new message from Diego
+            new_message: The new message from the owner
             max_tokens: Max tokens in the response
 
         Returns:

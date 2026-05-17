@@ -3,7 +3,7 @@
 
 # Perfil personal del dueño (contiene información privada)
 owner-profile.md
-diego-profile.md
+*-profile.md
 
 # Data folder — all generated/sensitive files
 data/*.db

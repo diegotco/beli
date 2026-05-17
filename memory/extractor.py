@@ -13,8 +13,8 @@ from memory.manager import MemoryManager
 logger = logging.getLogger("beli.extractor")
 
 EXTRACTION_PROMPT = """
-Analiza esta conversación entre Diego y su asistente personal Beli.
-Tu tarea es extraer hechos importantes sobre Diego que valga la pena recordar a largo plazo.
+Analiza esta conversación entre el propietario y su asistente personal Beli.
+Tu tarea es extraer hechos importantes sobre el propietario que valga la pena recordar a largo plazo.
 
 Qué SÍ recordar:
 - Datos personales relevantes (trabajo, ciudad, familia, proyectos)
@@ -87,7 +87,7 @@ class FactExtractor:
 
         # Formatear la conversación para Claude
         conversation_text = "\n".join(
-            f"{'Diego' if m['role'] == 'user' else 'Beli'}: {m['content']}"
+            f"{'Usuario' if m['role'] == 'user' else 'Beli'}: {m['content']}"
             for m in new_messages
         )
 

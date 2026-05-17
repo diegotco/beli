@@ -6,19 +6,17 @@ TOOLS = [
     {
         "name": "find_telegram_contact",
         "description": (
-            "Searches Diego's real Telegram contact list by name and returns who was found. "
+            "Searches the owner's real Telegram contact list by name and returns who was found. "
             "Use this FIRST before sending any message to a first-time contact. "
-            "Returns the contact's full name, @username, and ID so Diego can confirm it's the right person. "
-            "You already know nickname→real name mappings from Diego's profile: "
-            "Alanis=Bernardo, Sensei=Esteban, Cetre=Silvia, Agus=Agustín, Joaco=Joaquín. "
-            "Always translate the nickname to the real name before calling this tool."
+            "Returns the contact's full name, @username, and ID so the owner can confirm it's the right person. "
+            "If the owner uses a nickname, look up the real name in their profile (owner-profile.md) before calling this tool."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "name": {
                     "type": "string",
-                    "description": "The contact's real first name to search for (e.g. 'Bernardo', 'Esteban', 'Silvia').",
+                    "description": "The contact's real first name to search for.",
                 },
             },
             "required": ["name"],
@@ -39,7 +37,7 @@ TOOLS = [
             "properties": {
                 "nickname": {
                     "type": "string",
-                    "description": "Diego's nickname for this contact (e.g. 'alanis', 'sensei'). Used as cache key.",
+                    "description": "The owner's nickname for this contact (e.g. 'mom', 'boss'). Used as cache key.",
                 },
                 "telegram_id": {
                     "type": "integer",
@@ -48,9 +46,9 @@ TOOLS = [
                 "username": {
                     "type": "string",
                     "description": (
-                        "Telegram @username of the recipient (e.g. '@hermes_de_diego_bot' or 'hermes_de_diego_bot'). "
+                        "Telegram @username of the recipient (e.g. '@some_bot' or 'some_bot'). "
                         "Works for regular users AND bots. Use this whenever you know the @username — "
-                        "it is the most reliable identifier and does NOT require the person to be in Diego's contacts."
+                        "it is the most reliable identifier and does NOT require the person to be in the owner's contacts."
                     ),
                 },
                 "contact_phone": {
@@ -71,8 +69,8 @@ TOOLS = [
     {
         "name": "read_telegram_chats",
         "description": (
-            "Reads Diego's most recent Telegram conversations and returns a summary. "
-            "Use this when Diego asks to check, review, or summarize his Telegram chats. "
+            "Reads the owner's most recent Telegram conversations and returns a summary. "
+            "Use this when the owner asks to check, review, or summarize their Telegram chats. "
             "Returns the sender name, last message, and timestamp for each chat."
         ),
         "input_schema": {
@@ -90,7 +88,7 @@ TOOLS = [
         "name": "read_chat_history",
         "description": (
             "Reads the recent message history of a specific Telegram chat or contact. "
-            "Use this when Diego asks to summarize, review, or search messages inside a specific conversation. "
+            "Use this when the owner asks to summarize, review, or search messages inside a specific conversation. "
             "Search by the contact or group name."
         ),
         "input_schema": {
@@ -98,7 +96,7 @@ TOOLS = [
             "properties": {
                 "chat_name": {
                     "type": "string",
-                    "description": "Name of the contact or group to read (e.g. 'OTC Financial Markets', 'Alanis').",
+                    "description": "Name of the contact or group to read (e.g. 'Work Group', 'John').",
                 },
                 "limit": {
                     "type": "integer",
@@ -111,12 +109,12 @@ TOOLS = [
     {
         "name": "send_email",
         "description": (
-            "Sends an email from Beli's address (beli@agentmail.to) on Diego's behalf. "
-            "Use when Diego asks to send an email. "
-            "If Diego provides an email address directly in his message (e.g. 'envía un correo a foo@bar.com'), "
+            "Sends an email from Beli's address (beli@agentmail.to) on the owner's behalf. "
+            "Use when the owner asks to send an email. "
+            "If the owner provides an email address directly in their message (e.g. 'envía un correo a foo@bar.com'), "
             "use that address as `to` — do NOT ask who the recipient is. "
-            "If Diego mentions a contact name instead of an email, look it up in contacts.json. "
-            "Draft a subject and body based on Diego's instructions, show him the draft, and ask for confirmation before sending."
+            "If the owner mentions a contact name instead of an email, look it up in contacts.json. "
+            "Draft a subject and body based on the owner's instructions, show the draft, and ask for confirmation before sending."
         ),
         "input_schema": {
             "type": "object",
@@ -125,17 +123,17 @@ TOOLS = [
                     "type": "string",
                     "description": (
                         "Recipient email address. "
-                        "Extract directly from Diego's message if he provides one (e.g. 'a diegotco@yahoo.com' → 'diegotco@yahoo.com'). "
-                        "If Diego gives a contact name, use their email from contacts.json."
+                        "Extract directly from the owner's message if they provide one. "
+                        "If the owner gives a contact name, use their email from contacts.json."
                     ),
                 },
                 "subject": {
                     "type": "string",
-                    "description": "Email subject — infer from Diego's instructions if not explicitly stated.",
+                    "description": "Email subject — infer from the owner's instructions if not explicitly stated.",
                 },
                 "body": {
                     "type": "string",
-                    "description": "Full email body. Write it based on Diego's instructions.",
+                    "description": "Full email body. Write it based on the owner's instructions.",
                 },
             },
             "required": ["to", "subject", "body"],

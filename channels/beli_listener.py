@@ -1,7 +1,7 @@
 """
 channels/beli_listener.py - Listens for incoming messages on Beli's own Telegram account.
 
-When someone replies to Beli or starts a conversation with her, Diego is notified
+When someone replies to Beli or starts a conversation with her, the owner is notified
 immediately via the bot with the sender's name and message content.
 """
 import logging
@@ -16,7 +16,7 @@ logger = logging.getLogger("beli.listener")
 
 class BeliListener:
     """
-    Keeps Beli's Telethon session open and forwards incoming messages to Diego.
+    Keeps Beli's Telethon session open and forwards incoming messages to the owner.
     Lifecycle: call start() when the bot starts, stop() when it shuts down.
     """
 

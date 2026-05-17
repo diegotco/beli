@@ -25,7 +25,7 @@ a typical conversation costs less than $0.001. With normal usage, monthly cost i
 3. Send the message: `/newbot`
 4. BotFather will ask for:
    - **Bot name**: type `Beli` (or whatever display name you want)
-   - **Bot username**: must end in `bot`, e.g. `beli_diego_bot`
+   - **Bot username**: must end in `bot`, e.g. `beli_myassistant_bot`
 5. BotFather will give you a token like: `123456789:ABCdefGHIjklMNOpqrSTUvwxYZ`
 6. Copy that token
 
@@ -59,7 +59,7 @@ Open Terminal (Mac: `Cmd + Space`, type "Terminal") and run:
 
 ```bash
 # Navigate to the project folder
-cd /Users/diego/Documents/Beli
+cd /path/to/beli
 
 # Install dependencies
 pip3 install -r requirements.txt

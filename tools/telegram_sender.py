@@ -2,7 +2,7 @@
 tools/telegram_sender.py - Telegram contact search and message sending via Telethon.
 
 Two-step flow for safety:
-  1. find_telegram_contact() → returns match details for Diego to confirm
+  1. find_telegram_contact() → returns match details for the owner to confirm
   2. send_telegram_message()  → sends using the confirmed telegram_id, then caches
 """
 import json
@@ -19,7 +19,7 @@ from telethon.tl.types import InputPhoneContact, User, Channel, Chat
 
 logger = logging.getLogger("beli.tools.telegram_sender")
 
-_DIEGO_SESSION_PATH = str(Path(__file__).parent.parent / "data" / "telethon_session")
+_OWNER_SESSION_PATH = str(Path(__file__).parent.parent / "data" / "telethon_session")
 _BELI_SESSION_PATH  = str(Path(__file__).parent.parent / "data" / "beli_session")
 _CACHE_PATH         = Path(__file__).parent.parent / "data" / "contact_cache.json"
 
@@ -27,10 +27,10 @@ _CACHE_PATH         = Path(__file__).parent.parent / "data" / "contact_cache.jso
 # reuses the already-open connection instead of creating a second one.
 _shared_beli_client = None
 
-def _diego_client(api_id: int, api_hash: str) -> TelegramClient:
-    """Returns a TelegramClient for Diego's account (StringSession in cloud, file locally)."""
+def _owner_client(api_id: int, api_hash: str) -> TelegramClient:
+    """Returns a TelegramClient for the owner's account (StringSession in cloud, file locally)."""
     from config import config
-    session = StringSession(config.DIEGO_SESSION_STRING) if config.DIEGO_SESSION_STRING else _DIEGO_SESSION_PATH
+    session = StringSession(config.OWNER_SESSION_STRING) if config.OWNER_SESSION_STRING else _OWNER_SESSION_PATH
     return TelegramClient(session, api_id, api_hash)
 
 def _beli_client(api_id: int, api_hash: str) -> TelegramClient:
@@ -72,10 +72,10 @@ def _save_to_cache(nickname: str, name: str, telegram_id: int = None, username: 
 
 async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
     """
-    Searches Diego's Telegram contacts by name.
+    Searches the owner's Telegram contacts by name.
     Checks the confirmed-contact cache first — if a match is found there,
     returns immediately without hitting the Telegram API and without asking
-    Diego for confirmation (it was already confirmed in a prior session).
+    the owner for confirmation (it was already confirmed in a prior session).
     """
     logger.info(f"Searching Telegram contacts for: '{name}'")
     search_lower = name.lower().strip()
@@ -94,12 +94,12 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
                 f"{', @' + uname if uname else ''}). "
                 f"Envía el mensaje directamente con "
                 f"send_telegram_message(nickname='{nick}', message='...'). "
-                f"NO pidas confirmación a Diego — ya fue confirmado antes."
+                f"NO pidas confirmación — ya fue confirmado antes."
             )
 
-    # ── Live search via Telegram API (uses Diego's session = his contact list) ─
+    # ── Live search via Telegram API (uses owner's session = their contact list) ─
     try:
-        async with _diego_client(api_id, api_hash) as client:
+        async with _owner_client(api_id, api_hash) as client:
             result = await client(GetContactsRequest(hash=0))
             all_contacts = result.users
             search = name.lower().strip()
@@ -119,8 +119,8 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
 
             if not matches:
                 return (
-                    f"No encontré ningún contacto llamado '{name}' en la lista de Telegram de Diego. "
-                    f"Pídele a Diego que te dé el @username o número de teléfono exacto."
+                    f"No encontré ningún contacto llamado '{name}' en la lista de Telegram del propietario. "
+                    f"Pide al propietario que te dé el @username o número de teléfono exacto."
                 )
 
             def _format_contact(c, index=None) -> str:
@@ -136,14 +136,14 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
                 return (
                     f"Encontré 1 contacto:\n{_format_contact(c)}\n\n"
                     f"{'Este contacto solo tiene número de teléfono (' + phone_val + '), sin @username. Puedes enviarle el mensaje usando contact_phone=' + phone_val + '.' if phone_val and not c.username else ''}"
-                    f"Muéstrale estos datos a Diego y confirma que es la persona correcta antes de enviar."
+                    f"Muéstrale estos datos al propietario y confirma que es la persona correcta antes de enviar."
                 )
 
             # Multiple matches
             lines = "\n".join(_format_contact(c, i+1) for i, c in enumerate(matches))
             return (
                 f"Encontré {len(matches)} contactos que coinciden con '{name}':\n{lines}\n\n"
-                f"Pregúntale a Diego cuál es el correcto."
+                f"Pregúntale al propietario cuál es el correcto."
             )
 
     except Exception as e:
@@ -165,7 +165,7 @@ async def send_telegram_message(
     """
     Sends a Telegram message using:
     - telegram_id (int): direct Telegram user ID
-    - username (str): @username, works for users AND bots (e.g. '@hermes_de_diego_bot')
+    - username (str): @username, works for users AND bots (e.g. '@some_bot')
     - contact_phone (str): phone in international format e.g. '+19293959561'
     - nickname only: looks up in cache
     """
@@ -264,14 +264,14 @@ async def send_telegram_message(
 
 async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str:
     """
-    Reads Diego's most recent Telegram conversations using his own session.
+    Reads the owner's most recent Telegram conversations using their own session.
     Returns a human-readable summary of each chat with sender, preview, and time.
     """
     limit = min(max(1, limit), 20)
-    logger.info(f"Reading {limit} most recent Telegram chats for Diego.")
+    logger.info(f"Reading {limit} most recent Telegram chats for the owner.")
 
     try:
-        async with _diego_client(api_id, api_hash) as client:
+        async with _owner_client(api_id, api_hash) as client:
             dialogs = await client.get_dialogs(limit=limit)
             if not dialogs:
                 return "No encontré conversaciones recientes en Telegram."
@@ -320,7 +320,7 @@ async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: i
     logger.info(f"Reading chat history for '{chat_name}' (last {limit} messages).")
 
     try:
-        async with _diego_client(api_id, api_hash) as client:
+        async with _owner_client(api_id, api_hash) as client:
             # Find the dialog by name
             search = chat_name.lower().strip()
             target = None
@@ -349,7 +349,7 @@ async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: i
                     continue
                 ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
                 if msg.out:
-                    sender = "Diego"
+                    sender = "Tú"
                 else:
                     entity = target.entity
                     if isinstance(entity, User):

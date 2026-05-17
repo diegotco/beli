@@ -7,7 +7,7 @@ anthropic>=0.25.0
 # Canal Telegram (job-queue necesario para tareas programadas)
 python-telegram-bot[job-queue]>=20.7
 
-# Telethon: Telegram User API (para enviar mensajes a contactos de Diego)
+# Telethon: Telegram User API (para enviar mensajes a contactos del propietario)
 telethon>=1.36.0
 
 # HTTP requests (para AgentMail API)

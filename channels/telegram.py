@@ -226,7 +226,7 @@ class TelegramChannel:
         logger.info(f"Respuesta enviada a {user_name}: {response[:80]}{'...' if len(response) > 80 else ''}")
 
     async def _handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Processes an image sent by Diego — passes it to Claude's vision."""
+        """Processes an image sent by the owner — passes it to Claude's vision."""
         user = update.effective_user
         user_id = str(user.id)
         caption = update.message.caption or ""
@@ -258,7 +258,7 @@ class TelegramChannel:
         )
 
         # Save to memory as text (images aren't stored, only the caption + response)
-        label = f"[imagen enviada por Diego{': ' + caption if caption else ''}]"
+        label = f"[imagen enviada por el propietario{': ' + caption if caption else ''}]"
         await self.memory.save_message(CHANNEL, user_id, "user", label)
         await self.memory.save_message(CHANNEL, user_id, "assistant", response)
 
