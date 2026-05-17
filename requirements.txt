@@ -1,20 +1,20 @@
-# Beli - Agente de IA Personal
-# Instalar con: pip install -r requirements.txt
+# Beli - Personal AI Agent
+# Install with: pip install -r requirements.txt
 
-# Cerebro de Beli (Claude AI)
+# Beli's brain (Claude AI)
 anthropic>=0.25.0
 
-# Canal Telegram (job-queue necesario para tareas programadas)
+# Telegram channel (job-queue required for scheduled tasks)
 python-telegram-bot[job-queue]>=20.7
 
-# Telethon: Telegram User API (para enviar mensajes a contactos del propietario)
+# Telethon: Telegram User API (to send messages to the owner's contacts)
 telethon>=1.36.0
 
-# HTTP requests (para AgentMail API)
+# HTTP requests (for AgentMail API)
 requests>=2.31.0
 
-# Variables de entorno
+# Environment variables
 python-dotenv>=1.0.0
 
-# Base de datos async (memoria persistente)
+# Async database (persistent memory)
 aiosqlite>=0.20.0
