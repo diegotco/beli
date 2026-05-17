@@ -53,6 +53,7 @@ class Config:
 
     # Telegram Bot (chat interface between Beli and the owner)
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    TELEGRAM_BOT_USERNAME: str = os.getenv("TELEGRAM_BOT_USERNAME", "")
 
     # Telegram User API credentials (shared by both sessions)
     TELEGRAM_API_ID: int = int(os.getenv("TELEGRAM_API_ID", "0"))
