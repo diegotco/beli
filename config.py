@@ -72,6 +72,9 @@ class Config:
     AGENTMAIL_API_KEY: str = os.getenv("AGENTMAIL_API_KEY", "")
     AGENTMAIL_INBOX_ID: str = os.getenv("AGENTMAIL_INBOX_ID", "beli")
 
+    # Groq (voice note transcription via Whisper)
+    GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+
     # Memory
     MEMORY_WINDOW: int = int(os.getenv("MEMORY_WINDOW", "20"))
 

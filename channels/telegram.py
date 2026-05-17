@@ -26,6 +26,7 @@ from memory.manager import MemoryManager
 from memory.extractor import FactExtractor
 from personality import get_system_prompt
 from channels.beli_listener import BeliListener
+from tools.transcriber import transcribe_audio
 
 logger = logging.getLogger("beli.telegram")
 
@@ -99,6 +100,10 @@ class TelegramChannel:
         # Photo / screenshot messages
         self.app.add_handler(
             MessageHandler(filters.PHOTO, self._handle_photo)
+        )
+        # Voice notes
+        self.app.add_handler(
+            MessageHandler(filters.VOICE, self._handle_voice)
         )
         # Global error handler
         self.app.add_error_handler(self._error_handler)
@@ -267,6 +272,65 @@ class TelegramChannel:
         else:
             for chunk in _split_text(response, 4096):
                 await update.message.reply_text(chunk)
+
+    async def _handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Transcribes a voice note via Groq Whisper, then processes it like a text message."""
+        from config import config
+
+        user = update.effective_user
+        user_id = str(user.id)
+        user_name = user.full_name or user.username or user_id
+
+        logger.info(f"Voice note received from {user_name} (id={user_id})")
+        await update.message.chat.send_action(ChatAction.TYPING)
+        await self.memory.register_telegram_chat(update.effective_chat.id)
+
+        # Download the voice file (.ogg)
+        voice_file = await context.bot.get_file(update.message.voice.file_id)
+        buf = io.BytesIO()
+        await voice_file.download_to_memory(buf)
+        audio_bytes = buf.getvalue()
+
+        # Transcribe with Groq Whisper
+        transcription = transcribe_audio(
+            api_key=config.GROQ_API_KEY,
+            audio_bytes=audio_bytes,
+            filename="voice.ogg",
+        )
+
+        if transcription.startswith("ERROR:"):
+            logger.error(f"Transcription failed: {transcription}")
+            await update.message.reply_text(
+                "No pude transcribir tu nota de voz. Intenta enviando el mensaje en texto."
+            )
+            return
+
+        logger.info(f"Transcribed voice from {user_name}: {transcription[:80]}")
+
+        # From here: treat exactly like a text message
+        history = await self.memory.get_history(CHANNEL, user_id)
+        facts = await self.memory.get_facts(CHANNEL, user_id)
+        extra_context = "\n".join(f"- {f}" for f in facts) if facts else ""
+        system = get_system_prompt(extra_context)
+
+        response = await self.brain.think(
+            system_prompt=system,
+            history=history,
+            new_message=transcription,
+        )
+
+        # Save to memory with a label indicating it was a voice note
+        label = f"[nota de voz]: {transcription}"
+        await self.memory.save_message(CHANNEL, user_id, "user", label)
+        await self.memory.save_message(CHANNEL, user_id, "assistant", response)
+
+        if len(response) <= 4096:
+            await update.message.reply_text(response)
+        else:
+            for chunk in _split_text(response, 4096):
+                await update.message.reply_text(chunk)
+
+        logger.info(f"Response sent to {user_name} (voice→text): {response[:80]}")
 
     # ------------------------------------------------------------------
     # JOBS & ERROR HANDLER
