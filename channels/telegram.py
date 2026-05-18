@@ -82,6 +82,7 @@ class TelegramChannel:
         self.app.add_handler(CommandHandler("ayuda", self._cmd_help))
         self.app.add_handler(CommandHandler("memoria", self._cmd_memory))
         self.app.add_handler(CommandHandler("contactos", self._cmd_contacts))
+        self.app.add_handler(CommandHandler("digest", self._cmd_digest))
         # Hourly fact extraction job
         self.app.job_queue.run_repeating(
             self._job_extract_facts,
@@ -141,6 +142,7 @@ class TelegramChannel:
         help_text = (
             "Soy Beli, tu asistente personal con IA.\n\n"
             "Comandos:\n"
+            "  /digest  — resumen de tus chats recientes de Telegram con sugerencias de respuesta\n"
             "  /borrar  — borra el historial de conversación\n"
             "  /memoria — muestra los hechos que recuerdo sobre ti\n"
             "  /ayuda   — muestra esta ayuda\n\n"
@@ -168,6 +170,41 @@ class TelegramChannel:
             for nickname, data in cache.items()
         )
         await update.message.reply_text(f"Contactos guardados en caché:\n\n{lines}")
+
+    async def _cmd_digest(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Reads and summarizes the owner's recent Telegram activity with reply suggestions."""
+        user_id = str(update.effective_user.id)
+        await update.message.chat.send_action(ChatAction.TYPING)
+        await self.memory.register_telegram_chat(update.effective_chat.id)
+
+        history = await self.memory.get_history(CHANNEL, user_id)
+        facts   = await self.memory.get_facts(CHANNEL, user_id)
+        extra   = "\n".join(f"- {f}" for f in facts) if facts else ""
+        system  = get_system_prompt(extra)
+
+        prompt = (
+            "Revisa mis chats recientes de Telegram usando read_telegram_chats. "
+            "Para los chats con mensajes sin leer o que claramente necesiten respuesta, "
+            "usa read_chat_history para ver el contexto completo. "
+            "Luego dame un resumen claro: qué pasó, quién escribió, qué necesita respuesta urgente, "
+            "y sugiere un borrador de respuesta para cada uno. "
+            "Sé conciso y práctico."
+        )
+
+        response = await self.brain.think(
+            system_prompt=system,
+            history=history,
+            new_message=prompt,
+        )
+
+        await self.memory.save_message(CHANNEL, user_id, "user", "[/digest — resumen de actividad en Telegram]")
+        await self.memory.save_message(CHANNEL, user_id, "assistant", response)
+
+        if len(response) <= 4096:
+            await update.message.reply_text(response)
+        else:
+            for chunk in _split_text(response, 4096):
+                await update.message.reply_text(chunk)
 
     async def _cmd_memory(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Shows the saved facts about the user."""

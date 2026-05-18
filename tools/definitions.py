@@ -107,6 +107,43 @@ TOOLS = [
         },
     },
     {
+        "name": "send_as_owner",
+        "description": (
+            "Sends a Telegram message FROM the owner's personal account (ghost mode). "
+            "The recipient sees the message as if the owner wrote it directly — Beli's account is NOT shown. "
+            "Use this when the owner says 'respóndele', 'dile', 'mándale', 'escríbele' referring to a reply "
+            "they want to send AS THEMSELVES. "
+            "ALWAYS show a draft first and wait for explicit confirmation before calling this tool. "
+            "Never use this tool without the owner's explicit 'sí', 'dale', 'envíalo', or equivalent confirmation."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "nickname": {
+                    "type": "string",
+                    "description": "The owner's nickname for this contact (e.g. 'mom', 'carlos'). Used as cache key.",
+                },
+                "telegram_id": {
+                    "type": "integer",
+                    "description": "Telegram user ID. Use when available (from cache or contact search).",
+                },
+                "username": {
+                    "type": "string",
+                    "description": "Telegram @username of the recipient (without @).",
+                },
+                "contact_phone": {
+                    "type": "string",
+                    "description": "Phone in international format (e.g. '+15550001234').",
+                },
+                "message": {
+                    "type": "string",
+                    "description": "The exact message text to send as the owner.",
+                },
+            },
+            "required": ["nickname", "message"],
+        },
+    },
+    {
         "name": "send_email",
         "description": (
             "Sends an email from Beli's address (beli@agentmail.to) on the owner's behalf. "

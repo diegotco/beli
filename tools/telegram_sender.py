@@ -262,6 +262,76 @@ async def send_telegram_message(
 
 # ── Tool 3: Read recent chats (overview) ────────────────────────────────────
 
+async def send_as_owner(
+    api_id: int,
+    api_hash: str,
+    nickname: str,
+    message: str,
+    telegram_id: int | None = None,
+    username: str | None = None,
+    contact_phone: str | None = None,
+) -> str:
+    """
+    Sends a message FROM the owner's personal Telegram account (ghost mode).
+    The recipient sees the message as coming from the owner, not from Beli.
+    Requires explicit owner confirmation before calling.
+    """
+    cache = _load_cache()
+    cached = cache.get(nickname.lower())
+
+    if username:
+        username = username.lstrip("@")
+
+    # Resolve identifier
+    if telegram_id:
+        identifier = int(telegram_id)
+        logger.info(f"[Ghost] Using telegram_id={telegram_id} for '{nickname}'")
+    elif username:
+        identifier = username
+        logger.info(f"[Ghost] Using @{username} for '{nickname}'")
+    elif contact_phone:
+        identifier = contact_phone
+        logger.info(f"[Ghost] Using phone={contact_phone} for '{nickname}'")
+    elif cached:
+        if cached.get("telegram_id"):
+            identifier = int(cached["telegram_id"])
+        elif cached.get("username"):
+            identifier = cached["username"]
+        elif cached.get("phone"):
+            identifier = cached["phone"]
+        else:
+            return f"El contacto '{nickname}' está en caché pero sin ID, @username ni teléfono."
+        logger.info(f"[Ghost] Cache hit: '{nickname}' → {cached['name']} ({identifier})")
+    else:
+        return (
+            f"No tengo forma de contactar a '{nickname}'. "
+            f"Proporciona telegram_id, @username, o teléfono."
+        )
+
+    try:
+        async with _owner_client(api_id, api_hash) as client:
+            try:
+                entity = await client.get_entity(identifier)
+            except Exception as e:
+                return f"No pude encontrar el contacto '{nickname}': {e}"
+
+            await client.send_message(entity, message)
+
+            full_name = f"{getattr(entity, 'first_name', '') or ''} {getattr(entity, 'last_name', '') or ''}".strip()
+            uname     = getattr(entity, "username", "") or ""
+            logger.info(f"[Ghost] Sent as owner → {full_name}")
+            return (
+                f"✓ ENVIADO EXITOSAMENTE como tú a {full_name} "
+                f"({'@' + uname if uname else contact_phone or 'sin @username'})."
+            )
+
+    except FloodWaitError as e:
+        return f"Telegram pidió esperar {e.seconds} segundos antes de enviar más mensajes."
+    except Exception as e:
+        logger.exception(f"[Ghost] Error sending as owner to '{nickname}': {e}")
+        return f"Error al enviar el mensaje desde tu cuenta: {e}"
+
+
 async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str:
     """
     Reads the owner's most recent Telegram conversations using their own session.

@@ -5,7 +5,7 @@ import asyncio
 import logging
 from functools import partial
 from config import config
-from tools.telegram_sender import find_telegram_contact, send_telegram_message, read_telegram_chats, read_chat_history
+from tools.telegram_sender import find_telegram_contact, send_telegram_message, send_as_owner, read_telegram_chats, read_chat_history
 from tools.email_sender import send_email
 
 logger = logging.getLogger("beli.tools.executor")
@@ -24,6 +24,17 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
 
     if tool_name == "send_telegram_message":
         return await send_telegram_message(
+            api_id=config.TELEGRAM_API_ID,
+            api_hash=config.TELEGRAM_API_HASH,
+            nickname=tool_input.get("nickname", ""),
+            message=tool_input.get("message", ""),
+            telegram_id=tool_input.get("telegram_id"),
+            username=tool_input.get("username"),
+            contact_phone=tool_input.get("contact_phone"),
+        )
+
+    if tool_name == "send_as_owner":
+        return await send_as_owner(
             api_id=config.TELEGRAM_API_ID,
             api_hash=config.TELEGRAM_API_HASH,
             nickname=tool_input.get("nickname", ""),
