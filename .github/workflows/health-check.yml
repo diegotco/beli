@@ -16,9 +16,8 @@ jobs:
             https://web-production-f3c9e.up.railway.app/health)
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "HTTP status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "failed=true" >> "$GITHUB_OUTPUT"
-          fi
+          # SIMULACIÓN DE CRASH — forzar fallo para probar la alerta
+          echo "failed=true" >> "$GITHUB_OUTPUT"
 
       - name: Alert via Telegram if down
         if: steps.check.outputs.failed == 'true'
