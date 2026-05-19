@@ -123,13 +123,16 @@ def main() -> None:
     )
 
     # Wire up WhatsApp webhook callback
-    owner_chat_id = int(os.getenv("OWNER_TELEGRAM_CHAT_ID", "0"))
-    if owner_chat_id and config.WAHA_URL:
+    if config.OWNER_TELEGRAM_CHAT_ID and config.WAHA_URL:
         def _on_whatsapp(payload: dict) -> None:
             handle_webhook(
                 payload=payload,
                 bot_token=config.TELEGRAM_BOT_TOKEN,
-                owner_chat_id=owner_chat_id,
+                owner_chat_id=config.OWNER_TELEGRAM_CHAT_ID,
+                waha_url=config.WAHA_URL,
+                waha_session=config.WAHA_SESSION,
+                waha_api_key=config.WAHA_API_KEY,
+                groq_api_key=config.GROQ_API_KEY,
             )
         _HealthHandler.whatsapp_callback = _on_whatsapp
         logger.info("WhatsApp webhook handler registered.")

@@ -75,6 +75,9 @@ class Config:
     # Groq (voice note transcription via Whisper)
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 
+    # Owner's Telegram chat ID (used for WhatsApp webhook notifications)
+    OWNER_TELEGRAM_CHAT_ID: int = int(os.getenv("OWNER_TELEGRAM_CHAT_ID", "0"))
+
     # Memory
     MEMORY_WINDOW: int = int(os.getenv("MEMORY_WINDOW", "20"))
 
