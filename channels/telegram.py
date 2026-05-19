@@ -4,6 +4,7 @@ channels/telegram.py - Telegram module for Beli.
 Connects Beli to Telegram using python-telegram-bot.
 Handles incoming messages, passes them to the brain, and returns the response.
 """
+import asyncio
 import base64
 import calendar
 import datetime
