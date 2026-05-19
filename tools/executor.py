@@ -6,6 +6,7 @@ import logging
 from functools import partial
 from config import config
 from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history
+from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history
 from tools.email_sender import send_email
 
 logger = logging.getLogger("beli.tools.executor")
@@ -31,6 +32,32 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             telegram_id=tool_input.get("telegram_id"),
             username=tool_input.get("username"),
             contact_phone=tool_input.get("contact_phone"),
+        )
+
+    if tool_name == "send_whatsapp_message":
+        return send_whatsapp_message(
+            waha_url=config.WAHA_URL,
+            recipient=tool_input.get("recipient", ""),
+            message=tool_input.get("message", ""),
+            session=config.WAHA_SESSION,
+            api_key=config.WAHA_API_KEY,
+        )
+
+    if tool_name == "read_whatsapp_chats":
+        return read_whatsapp_chats(
+            waha_url=config.WAHA_URL,
+            limit=tool_input.get("limit", 10),
+            session=config.WAHA_SESSION,
+            api_key=config.WAHA_API_KEY,
+        )
+
+    if tool_name == "read_whatsapp_chat_history":
+        return read_whatsapp_chat_history(
+            waha_url=config.WAHA_URL,
+            phone_or_name=tool_input.get("phone_or_name", ""),
+            limit=tool_input.get("limit", 30),
+            session=config.WAHA_SESSION,
+            api_key=config.WAHA_API_KEY,
         )
 
     if tool_name == "send_email":

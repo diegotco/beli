@@ -63,6 +63,11 @@ class Config:
     OWNER_SESSION_PATH: str = str(DATA_DIR / "telethon_session")
     OWNER_SESSION_STRING: str = os.getenv("OWNER_SESSION_STRING", "")
 
+    # WhatsApp via WAHA (self-hosted Docker on Railway)
+    WAHA_URL: str = os.getenv("WAHA_URL", "")          # e.g. https://waha.up.railway.app
+    WAHA_SESSION: str = os.getenv("WAHA_SESSION", "default")
+    WAHA_API_KEY: str = os.getenv("WAHA_API_KEY", "")
+
     # AgentMail (Beli's own email: beli@agentmail.to)
     AGENTMAIL_API_KEY: str = os.getenv("AGENTMAIL_API_KEY", "")
     AGENTMAIL_INBOX_ID: str = os.getenv("AGENTMAIL_INBOX_ID", "beli")
