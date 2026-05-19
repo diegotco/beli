@@ -123,7 +123,7 @@ class TelegramChannel:
         help_text = (
             "Soy Beli, tu asistente personal con IA.\n\n"
             "Comandos:\n"
-            "  /digest  — resumen de tus chats recientes de Telegram con sugerencias de respuesta\n"
+            "  /digest  — resumen de tus chats recientes de Telegram y WhatsApp con sugerencias de respuesta\n"
             "  /borrar  — borra el historial de conversación\n"
             "  /memoria — muestra los hechos que recuerdo sobre ti\n"
             "  /ayuda   — muestra esta ayuda\n\n"
@@ -164,12 +164,14 @@ class TelegramChannel:
         system  = get_system_prompt(extra)
 
         prompt = (
-            "Revisa mis chats recientes de Telegram usando read_telegram_chats. "
-            "Para los chats con mensajes sin leer o que claramente necesiten respuesta, "
-            "usa read_chat_history para ver el contexto completo. "
-            "Luego dame un resumen claro: qué pasó, quién escribió, qué necesita respuesta urgente, "
-            "y sugiere un borrador de respuesta para cada uno. "
-            "Sé conciso y práctico."
+            "Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp:\n"
+            "1. Usa read_telegram_chats para ver mis chats de Telegram recientes. "
+            "Para los que tengan mensajes sin leer o necesiten respuesta, usa read_chat_history.\n"
+            "2. Usa read_whatsapp_chats para ver mis chats de WhatsApp recientes. "
+            "Para los que necesiten respuesta, usa read_whatsapp_chat_history.\n"
+            "Luego dame un resumen unificado: qué pasó en cada plataforma, quién escribió, "
+            "qué necesita respuesta urgente, y un borrador de respuesta para cada uno. "
+            "Agrupa por plataforma (Telegram / WhatsApp). Sé conciso y práctico."
         )
 
         response = await self.brain.think(
