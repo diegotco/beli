@@ -24,6 +24,30 @@ def _extract_address(raw: str) -> str:
     return raw.strip()
 
 
+def _run_brain_async(brain, memory, owner_chat_id, sender, subject, body, bot_token) -> None:
+    """
+    Schedules _process_with_brain on PTB's running event loop (preferred) so that
+    aiosqlite and Telethon tools work correctly.  Falls back to asyncio.run() if
+    the PTB loop isn't available yet (e.g. during testing).
+    """
+    from channels.loop_ref import get_loop
+    coro = _process_with_brain(brain, memory, owner_chat_id, sender, subject, body, bot_token)
+    loop = get_loop()
+    if loop and loop.is_running():
+        # Submit to PTB's event loop from this HTTP-server thread
+        future = asyncio.run_coroutine_threadsafe(coro, loop)
+        # Log any exception that surfaces (non-blocking — fire and forget)
+        def _on_done(f):
+            exc = f.exception()
+            if exc:
+                logger.error(f"[Email] Brain processing raised: {exc}", exc_info=exc)
+        future.add_done_callback(_on_done)
+    else:
+        # Fallback: create a fresh event loop in this thread
+        logger.warning("[Email] PTB loop not available — falling back to asyncio.run()")
+        asyncio.run(coro)
+
+
 def handle_email_webhook(
     payload: dict,
     bot_token: str,
@@ -87,11 +111,10 @@ def handle_email_webhook(
             logger.info("[Email] From owner — routing through brain.")
             header = f"Correo tuyo | Asunto: {subject}"
             _send_telegram(bot_token, owner_chat_id, header)
-            asyncio.run(_process_with_brain(
+            _run_brain_async(
                 brain, memory, owner_chat_id,
                 sender, subject, body, bot_token,
-                ask_reply=False,  # it's the owner's own email — no need to ask
-            ))
+            )
 
         # ── Case 2: email from a third party → notify + ask if owner wants to reply ──
         else:

@@ -511,6 +511,10 @@ class TelegramChannel:
 
     async def _post_init(self, application) -> None:
         """Called by PTB after the bot is initialized but before polling starts."""
+        # Store the running event loop so HTTP threads can submit work to it safely
+        from channels.loop_ref import set_loop
+        set_loop(asyncio.get_running_loop())
+
         # Register visible command list (shown when user types "/")
         from telegram import BotCommand
         await application.bot.set_my_commands([

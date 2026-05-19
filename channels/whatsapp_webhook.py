@@ -113,6 +113,10 @@ def handle_webhook(
         msg_id      = msg.get("id", "")
         is_group    = chat_id.endswith("@g.us")
 
+        # Filter out WhatsApp system broadcasts (status updates, etc.)
+        if chat_id.startswith("status@") or chat_id == "status@broadcast":
+            return
+
         # For group messages the individual sender is in 'author' or 'from';
         # 'chatId' is the group ID, not the sender.
         sender_jid = (
