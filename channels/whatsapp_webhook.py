@@ -41,6 +41,20 @@ def _transcribe(groq_api_key: str, audio_bytes: bytes, filename: str = "voice.og
         return f"ERROR: {e}"
 
 
+def _get_group_name(waha_url: str, session: str, api_key: str, group_id: str) -> str | None:
+    """Fetches the group name from WAHA. Returns None on failure."""
+    try:
+        url  = f"{waha_url.rstrip('/')}/api/{session}/chats/{group_id}"
+        hdrs = {"X-Api-Key": api_key} if api_key else {}
+        resp = requests.get(url, headers=hdrs, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("name") or data.get("subject") or None
+    except Exception as e:
+        logger.warning(f"[WhatsApp] Could not fetch group name for {group_id}: {e}")
+        return None
+
+
 def _send_telegram(token: str, chat_id: int, text: str) -> None:
     """Sends a Telegram message synchronously via Bot API (no asyncio)."""
     try:
@@ -101,8 +115,21 @@ def handle_webhook(
             or chat_id.replace("@c.us", "").replace("@g.us", "")
             or "Desconocido"
         )
-        is_group      = chat_id.endswith("@g.us")
-        channel_label = "WhatsApp Grupo" if is_group else "WhatsApp"
+        is_group = chat_id.endswith("@g.us")
+
+        # For groups, try to resolve the group name via WAHA API
+        group_name = None
+        if is_group and waha_url:
+            group_name = (
+                msg.get("_data", {}).get("chat", {}).get("name")
+                or msg.get("_data", {}).get("subject")
+                or _get_group_name(waha_url, waha_session, waha_api_key, chat_id)
+            )
+
+        if is_group:
+            channel_label = f"WhatsApp Grupo: {group_name}" if group_name else "WhatsApp Grupo"
+        else:
+            channel_label = "WhatsApp"
 
         logger.info(f"[WhatsApp] Incoming {msg_type} from {sender_name} ({chat_id})")
 
