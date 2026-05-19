@@ -96,6 +96,8 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             api_hash=config.TELEGRAM_API_HASH,
             chat_name=tool_input.get("chat_name", ""),
             limit=tool_input.get("limit", 30),
+            groq_api_key=config.GROQ_API_KEY,
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
         )
 
     if tool_name == "read_telegram_chats":

@@ -401,12 +401,66 @@ async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str
         return f"Error al leer los chats de Telegram: {e}"
 
 
+# ── Media helpers ─────────────────────────────────────────────────────────────
+
+async def _download_msg_media(client: TelegramClient, msg) -> bytes | None:
+    """Downloads a Telethon message's media to bytes. Returns None on failure."""
+    try:
+        import io
+        buf = io.BytesIO()
+        await client.download_media(msg, file=buf)
+        buf.seek(0)
+        return buf.read()
+    except Exception as e:
+        logger.warning(f"[Telegram] Media download failed for msg {msg.id}: {e}")
+        return None
+
+
+async def _describe_image(api_key: str, image_bytes: bytes, caption: str = "") -> str:
+    """Describes an image via Claude Vision (single cheap API call). Returns description string."""
+    try:
+        import base64
+        import anthropic
+        client  = anthropic.AsyncAnthropic(api_key=api_key)
+        b64     = base64.b64encode(image_bytes).decode()
+        prompt  = "Describe esta imagen de forma concisa en 1-2 oraciones, en español."
+        if caption:
+            prompt += f" El caption del mensaje es: '{caption}'."
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=150,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
+                    },
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        logger.warning(f"[Telegram] Image description failed: {e}")
+        return "[imagen — no se pudo describir]"
+
+
 # ── Tool 4: Read full history of a specific chat ──────────────────────────────
 
-async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: int = 30) -> str:
+async def read_chat_history(
+    api_id: int,
+    api_hash: str,
+    chat_name: str,
+    limit: int = 30,
+    groq_api_key: str = "",
+    anthropic_api_key: str = "",
+) -> str:
     """
     Reads the recent message history of a specific Telegram chat by name.
     Works for individual contacts, groups, and channels.
+    Transcribes voice/audio messages via Groq Whisper if groq_api_key is set.
+    Describes images via Claude Vision if anthropic_api_key is set.
     """
     limit = min(max(1, limit), 100)
     logger.info(f"Reading chat history for '{chat_name}' (last {limit} messages).")
@@ -418,11 +472,19 @@ async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: i
             if entity is None:
                 return f"No encontré ninguna conversación llamada '{chat_name}' en Telegram."
 
+            # Lazy-import transcriber only if needed
+            transcriber = None
+            if groq_api_key:
+                try:
+                    from tools.transcriber import transcribe_audio
+                    transcriber = transcribe_audio
+                except ImportError:
+                    logger.warning("[Telegram] transcriber module not available")
+
             messages = []
             async for msg in client.iter_messages(entity, limit=limit):
-                if not msg.text:
-                    continue
                 ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+
                 if msg.out:
                     sender = "Tú"
                 elif isinstance(entity, User):
@@ -431,10 +493,63 @@ async def read_chat_history(api_id: int, api_hash: str, chat_name: str, limit: i
                     sender = (getattr(msg.sender, "first_name", "") or "Miembro").strip()
                 else:
                     sender = "Miembro"
-                messages.append(f"[{ts}] {sender}: {msg.text}")
+
+                # ── Text message ──────────────────────────────────────────────
+                if msg.text:
+                    body = msg.text[:200]
+
+                # ── Voice note / audio ────────────────────────────────────────
+                elif msg.voice or msg.audio:
+                    if transcriber:
+                        audio_bytes = await _download_msg_media(client, msg)
+                        if audio_bytes:
+                            filename = "voice.ogg" if msg.voice else "audio.mp3"
+                            text = transcriber(groq_api_key, audio_bytes, filename)
+                            body = f"[Audio] {text}" if not text.startswith("ERROR:") else "[audio — no se pudo transcribir]"
+                        else:
+                            body = "[audio — no se pudo descargar]"
+                    else:
+                        body = "[audio]"
+
+                # ── Photo / image ─────────────────────────────────────────────
+                elif msg.photo:
+                    caption = msg.message or ""
+                    if anthropic_api_key:
+                        image_bytes = await _download_msg_media(client, msg)
+                        if image_bytes:
+                            description = await _describe_image(anthropic_api_key, image_bytes, caption)
+                            body = f"[Imagen] {description}"
+                        else:
+                            body = "[imagen — no se pudo descargar]"
+                    else:
+                        body = f"[imagen{': ' + caption if caption else ''}]"
+
+                # ── Sticker ───────────────────────────────────────────────────
+                elif msg.sticker:
+                    body = "[sticker]"
+
+                # ── Video ─────────────────────────────────────────────────────
+                elif msg.video:
+                    body = f"[video{': ' + msg.message if msg.message else ''}]"
+
+                # ── Document / file ───────────────────────────────────────────
+                elif msg.document:
+                    fname = ""
+                    if msg.document.attributes:
+                        for attr in msg.document.attributes:
+                            fname = getattr(attr, "file_name", "") or ""
+                            if fname:
+                                break
+                    body = f"[archivo: {fname}]" if fname else "[archivo]"
+
+                # ── Other media ───────────────────────────────────────────────
+                else:
+                    continue  # skip service messages, polls, etc.
+
+                messages.append(f"[{ts}] {sender}: {body}")
 
             if not messages:
-                return f"No encontré mensajes de texto en la conversación con '{chat_name}'."
+                return f"No encontré mensajes en la conversación con '{chat_name}'."
 
             messages.reverse()  # chronological order
             return f"Últimos {len(messages)} mensajes de '{chat_name}':\n\n" + "\n".join(messages)
