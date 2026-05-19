@@ -461,6 +461,16 @@ class TelegramChannel:
 
     async def _post_init(self, application) -> None:
         """Called by PTB after the bot is initialized but before polling starts."""
+        # Register visible command list (shown when user types "/")
+        from telegram import BotCommand
+        await application.bot.set_my_commands([
+            BotCommand("digest",   "Resumen de tus chats recientes con sugerencias de respuesta"),
+            BotCommand("memoria",  "Ver los hechos que Beli recuerda sobre ti"),
+            BotCommand("timezone", "Cambiar zona horaria (ej. /timezone America/Merida)"),
+            BotCommand("borrar",   "Borrar el historial de conversación"),
+            BotCommand("ayuda",    "Ver todos los comandos disponibles"),
+        ])
+
         if self._tg_api_id and self._tg_api_hash and self._owner_chat_id:
             from channels.telegram_listener import run_listener
             asyncio.create_task(
