@@ -211,6 +211,11 @@ def handle_webhook(
                 f"Para responder: \"respóndele por WhatsApp a {first_name}: [tu mensaje]\""
             )
 
+        from settings.notifications import get_settings
+        if not get_settings().should_notify_whatsapp(chat_id):
+            logger.debug(f"[WhatsApp] Notifications disabled for {chat_id} — skipping.")
+            return
+
         _send_telegram(bot_token, owner_chat_id, notification)
 
     except Exception as e:

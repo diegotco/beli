@@ -12,10 +12,11 @@ import io
 import logging
 from pathlib import Path
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     MessageHandler,
     ContextTypes,
@@ -78,6 +79,8 @@ class TelegramChannel:
         self.app.add_handler(CommandHandler("contactos", self._cmd_contacts))
         self.app.add_handler(CommandHandler("digest", self._cmd_digest))
         self.app.add_handler(CommandHandler("timezone", self._cmd_timezone))
+        self.app.add_handler(CommandHandler("notificaciones", self._cmd_notifications))
+        self.app.add_handler(CallbackQueryHandler(self._cb_notifications, pattern="^notif:"))
         # Hourly fact extraction job
         self.app.job_queue.run_repeating(
             self._job_extract_facts,
@@ -139,6 +142,7 @@ class TelegramChannel:
             "Soy Beli, tu asistente personal con IA.\n\n"
             "Comandos:\n"
             "  /digest             — resumen de tus chats recientes de Telegram y WhatsApp\n"
+            "  /notificaciones     — activar/desactivar notificaciones en tiempo real\n"
             "  /timezone <zona>    — cambia tu zona horaria (actual: " + tz + ")\n"
             "  /borrar             — borra el historial de conversación\n"
             "  /memoria            — muestra los hechos que recuerdo sobre ti\n"
@@ -251,6 +255,51 @@ class TelegramChannel:
         else:
             lines = "\n".join(f"• {f}" for f in facts)
             await update.message.reply_text(f"Esto es lo que recuerdo sobre ti:\n\n{lines}")
+
+    # ------------------------------------------------------------------
+    # NOTIFICATION SETTINGS
+    # ------------------------------------------------------------------
+
+    def _notifications_keyboard(self) -> InlineKeyboardMarkup:
+        """Builds an inline keyboard showing the current notification toggle state."""
+        from settings.notifications import get_settings
+        s = get_settings()
+
+        def label(key: str, text: str) -> InlineKeyboardButton:
+            icon = "🟢" if s.is_enabled(key) else "🔴"
+            return InlineKeyboardButton(f"{icon} {text}", callback_data=f"notif:{key}")
+
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("── WhatsApp ──", callback_data="notif:noop")],
+            [label("whatsapp_direct", "Directos"), label("whatsapp_groups", "Grupos")],
+            [InlineKeyboardButton("── Telegram ──", callback_data="notif:noop")],
+            [label("telegram_direct", "Directos"), label("telegram_groups", "Grupos")],
+        ])
+
+    async def _cmd_notifications(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Shows the notification settings menu."""
+        await update.message.reply_text(
+            "🔔 Notificaciones en vivo\n\n"
+            "Activa las fuentes de las que quieres recibir mensajes en tiempo real.\n"
+            "Por defecto todo está desactivado.",
+            reply_markup=self._notifications_keyboard(),
+        )
+
+    async def _cb_notifications(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handles inline button presses for the notification settings menu."""
+        query = update.callback_query
+
+        key = query.data[len("notif:"):]  # strip "notif:" prefix
+        if key == "noop":
+            await query.answer()
+            return
+
+        from settings.notifications import get_settings
+        new_value = get_settings().toggle(key)
+        status_text = "✅ Activado" if new_value else "🔕 Desactivado"
+
+        await query.edit_message_reply_markup(reply_markup=self._notifications_keyboard())
+        await query.answer(status_text, show_alert=False)
 
     # ------------------------------------------------------------------
     # MESSAGES
@@ -465,11 +514,12 @@ class TelegramChannel:
         # Register visible command list (shown when user types "/")
         from telegram import BotCommand
         await application.bot.set_my_commands([
-            BotCommand("digest",   "Resumen de tus chats recientes con sugerencias de respuesta"),
-            BotCommand("memoria",  "Ver los hechos que Beli recuerda sobre ti"),
-            BotCommand("timezone", "Cambiar zona horaria (ej. /timezone America/Merida)"),
-            BotCommand("borrar",   "Borrar el historial de conversación"),
-            BotCommand("ayuda",    "Ver todos los comandos disponibles"),
+            BotCommand("digest",          "Resumen de tus chats recientes con sugerencias de respuesta"),
+            BotCommand("notificaciones",  "Activar/desactivar notificaciones en tiempo real"),
+            BotCommand("memoria",         "Ver los hechos que Beli recuerda sobre ti"),
+            BotCommand("timezone",        "Cambiar zona horaria (ej. /timezone America/Merida)"),
+            BotCommand("borrar",          "Borrar el historial de conversación"),
+            BotCommand("ayuda",           "Ver todos los comandos disponibles"),
         ])
 
         if self._tg_api_id and self._tg_api_hash and self._owner_chat_id:

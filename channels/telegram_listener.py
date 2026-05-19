@@ -85,6 +85,11 @@ async def _build_notification(event, client: TelegramClient, bot_token: str, own
         is_direct  = isinstance(chat, User)
         is_group   = isinstance(chat, (Chat, Channel))
 
+        # Check notification settings before going further
+        from settings.notifications import get_settings
+        if not get_settings().should_notify_telegram(is_group=is_group):
+            return
+
         # For groups/channels: skip muted ones
         if is_group:
             try:
