@@ -23,10 +23,10 @@ logger = logging.getLogger("beli.brain")
 MAX_TOOL_ROUNDS = 5  # Safety limit to prevent infinite tool loops
 
 # Tools that perform real-world sends — their results are the source of truth
-ACTION_TOOLS = {"send_telegram_message", "send_email"}
+ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner"}
 
-# Signal returned by every successful tool execution (defined in email_sender &
-# telegram_sender).  This is the ONLY accepted proof of a completed send.
+# Signal returned by every successful tool execution (defined in email_sender,
+# telegram_sender, and whatsapp_sender).  This is the ONLY accepted proof of a completed send.
 SUCCESS_SIGNAL = "✓ ENVIADO EXITOSAMENTE"
 
 # Spanish phrases Claude uses when it (falsely) claims to have sent something
