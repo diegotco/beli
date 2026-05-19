@@ -138,8 +138,9 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
                     f"Luego usa send_as_owner(nickname='...', telegram_id={tid}, message='...')."
                 )
 
+            kind_labels = {"contact": "contacto", "group": "grupo", "channel": "canal"}
             lines = "\n".join(
-                f"  {i+1}. [{{'contact':'contacto','group':'grupo','channel':'canal'}}.get(k, k)}] {lbl} (id={tid})"
+                f"  {i+1}. [{kind_labels.get(k, k)}] {lbl} (id={tid})"
                 for i, (k, tid, lbl) in enumerate(matches)
             )
             return (
