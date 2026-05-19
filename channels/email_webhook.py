@@ -148,8 +148,9 @@ async def _process_with_brain(
 
         history = await memory.get_history(CHANNEL, owner_chat_id)
         facts   = await memory.get_facts(CHANNEL, owner_chat_id)
+        facts_str = "\n".join(f"- {f}" for f in facts) if facts else ""
 
-        system_prompt = get_system_prompt(extra_context=facts)
+        system_prompt = get_system_prompt(facts_str)
 
         # Present the email as a message from the owner to Beli.
         # Explicit hint so Claude uses tools proactively (calendar, etc.)
