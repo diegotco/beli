@@ -183,8 +183,19 @@ def get_system_prompt(extra_context: str = "") -> str:
     so Beli knows exactly who is confirmed without needing to search or guess.
     Optionally enriched with extra context (e.g. recently extracted facts).
     """
+    import datetime
+    today = datetime.date.today()
+    weekdays_es = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    months_es   = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                   "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    date_line = (
+        f"Hoy es {weekdays_es[today.weekday()]} {today.day} de "
+        f"{months_es[today.month - 1]} de {today.year}."
+    )
+
     cache_section = _load_contact_cache_section()
     prompt = SYSTEM_PROMPT
+    prompt += f"\n\n## Fecha actual\n{date_line}"
     if cache_section:
         prompt += "\n\n" + cache_section
     if extra_context:
