@@ -99,6 +99,68 @@ TOOLS = [
         },
     },
     {
+        "name": "send_whatsapp_message",
+        "description": (
+            "Sends a WhatsApp message FROM the owner's personal number (ghost mode). "
+            "The recipient sees it as if the owner wrote it directly. "
+            "Use when the owner says 'mándale por WhatsApp', 'escríbele por WhatsApp', etc. "
+            "ALWAYS show a draft and wait for explicit confirmation before calling. "
+            "Accepts phone number ('+525561103975') or WhatsApp chat ID."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "recipient": {
+                    "type": "string",
+                    "description": "Phone number ('+525561103975'), WhatsApp chat ID ('525561103975@c.us' or group '120363xxx@g.us'), or contact/group name ('Ñaños', 'Mom'). Name-based lookup is supported.",
+                },
+                "message": {
+                    "type": "string",
+                    "description": "The exact message text to send.",
+                },
+            },
+            "required": ["recipient", "message"],
+        },
+    },
+    {
+        "name": "read_whatsapp_chats",
+        "description": (
+            "Reads the owner's most recent WhatsApp conversations. "
+            "Use when the owner asks to check, review, or summarize their WhatsApp chats."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of recent chats to read (default 10, max 20).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "read_whatsapp_chat_history",
+        "description": (
+            "Reads the recent message history of a specific WhatsApp chat. "
+            "Search by contact name or provide a phone number."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phone_or_name": {
+                    "type": "string",
+                    "description": "Contact name or phone number ('+525561103975').",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of messages to read (default 30, max 100).",
+                },
+            },
+            "required": ["phone_or_name"],
+        },
+    },
+    {
         "name": "send_email",
         "description": (
             "Sends an email from Beli's address (beli@agentmail.to) on the owner's behalf. "

@@ -46,6 +46,51 @@ def _headers(api_key: str = "") -> dict:
     return {}
 
 
+def _resolve_chat_id(
+    waha_url: str,
+    recipient: str,
+    session: str,
+    api_key: str,
+) -> tuple[str, str]:
+    """
+    Resolves a recipient string to a WhatsApp chat ID and display label.
+    Accepts: phone numbers, chat IDs (@c.us / @g.us), or contact/group names.
+    Returns: (chat_id, display_label)
+    """
+    # Already a proper WhatsApp ID
+    if "@" in recipient:
+        return recipient, recipient
+
+    # Looks like a phone number → convert directly
+    stripped = recipient.lstrip("+").replace(" ", "").replace("-", "")
+    if stripped.isdigit():
+        chat_id = f"{stripped}@c.us"
+        return chat_id, recipient
+
+    # Name-based lookup — search recent chats (covers both contacts and groups)
+    try:
+        resp = requests.get(
+            f"{waha_url.rstrip('/')}/api/{session}/chats",
+            params={"limit": 50},
+            headers=_headers(api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        chats = resp.json()
+        search = recipient.lower()
+        match = next(
+            (c for c in chats if search in _display_name(c).lower()),
+            None,
+        )
+        if match:
+            return match["id"], _display_name(match)
+    except Exception as e:
+        logger.warning(f"[WhatsApp] Name lookup failed for '{recipient}': {e}")
+
+    # Fallback: treat as individual contact ID (will likely fail, but surfaces the error)
+    return f"{stripped}@c.us", recipient
+
+
 def send_whatsapp_message(
     waha_url: str,
     recipient: str,
@@ -58,16 +103,12 @@ def send_whatsapp_message(
 
     Args:
         waha_url:  Base URL of the WAHA service (e.g. 'https://waha.up.railway.app')
-        recipient: Phone number ('+525561103975') or WhatsApp chat ID ('525561103975@c.us')
-                   or group ID ('120363xxxxxxxx@g.us')
+        recipient: Phone number ('+525561103975'), WhatsApp chat ID ('525561103975@c.us'),
+                   group ID ('120363xxxxxxxx@g.us'), or contact/group name ('Ñaños', 'Mom')
         message:   Text to send
         session:   WAHA session name (default: 'default')
     """
-    # Normalize to WhatsApp chat ID
-    if "@" not in recipient:
-        chat_id = _to_chat_id(recipient)
-    else:
-        chat_id = recipient
+    chat_id, display_label = _resolve_chat_id(waha_url, recipient, session, api_key)
 
     url     = f"{waha_url.rstrip('/')}/api/sendText"
     payload = {"session": session, "chatId": chat_id, "text": message}
@@ -78,7 +119,7 @@ def send_whatsapp_message(
         resp = requests.post(url, json=payload, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
         resp.raise_for_status()
         logger.info(f"[WhatsApp] Sent successfully to {chat_id}")
-        return f"✓ ENVIADO EXITOSAMENTE por WhatsApp a {recipient}."
+        return f"✓ ENVIADO EXITOSAMENTE por WhatsApp a {display_label}."
     except requests.HTTPError as e:
         detail = ""
         try:
