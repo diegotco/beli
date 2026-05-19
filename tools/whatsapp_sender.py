@@ -149,7 +149,7 @@ def read_whatsapp_chats(
     """
     Returns a summary of the owner's most recent WhatsApp conversations.
     """
-    limit = min(max(1, limit), 20)
+    limit = min(max(1, limit), 30)
     url   = f"{waha_url.rstrip('/')}/api/{session}/chats"
 
     logger.info(f"[WhatsApp] Reading {limit} recent chats.")
@@ -166,12 +166,12 @@ def read_whatsapp_chats(
         for i, chat in enumerate(chats[:limit], 1):
             name    = _display_name(chat)
             unread  = chat.get("unreadCount", 0)
-            last    = chat.get("lastMessage", {})
-            preview = (last.get("body") or "")[:80]
+            last    = chat.get("lastMessage") or {}
+            preview = (last.get("body") or last.get("caption") or "[sin preview]")[:80]
             from_me = last.get("fromMe", False)
             sender  = "Tú" if from_me else name.split()[0]
             unread_label = f" [{unread} sin leer]" if unread else ""
-            lines.append(f"{i}. *{name}*{unread_label}\n   {sender}: {preview}")
+            lines.append(f"{i}. {name}{unread_label}\n   {sender}: {preview}")
 
         return "Tus últimas conversaciones en WhatsApp:\n\n" + "\n\n".join(lines)
 

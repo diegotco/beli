@@ -192,20 +192,22 @@ class TelegramChannel:
         extra   = "\n".join(f"- {f}" for f in facts) if facts else ""
         system  = get_system_prompt(extra)
         tz      = await self.memory.get_setting("timezone", "America/Mexico_City")
+        import zoneinfo as _zi
+        _now    = datetime.datetime.now(tz=_zi.ZoneInfo(tz)).strftime("%A %d %b %Y, %H:%M")
 
         prompt = (
-            f"Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp. "
-            f"Muestra las horas en zona horaria {tz}.\n\n"
+            f"Son las {_now} ({tz}). Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp.\n\n"
             "PASO 1 — Telegram: llama read_telegram_chats con limit=20. "
-            "Para TODOS los chats que tengan mensajes sin leer (unread > 0) o actividad reciente de personas (no solo canales), "
-            "llama read_chat_history para ver el contexto. Identifica cuáles necesitan respuesta de mi parte.\n\n"
+            "Para TODOS los chats con mensajes sin leer (unread > 0), llama read_chat_history. "
+            "Si un chat solo contiene imágenes/media sin texto, indícalo brevemente ('solo comparte imágenes'). "
+            "Identifica cuáles necesitan respuesta.\n\n"
             "PASO 2 — WhatsApp: llama read_whatsapp_chats con limit=20. "
-            "Para TODOS los chats con mensajes sin leer o actividad reciente de personas, "
-            "llama read_whatsapp_chat_history para ver el contexto. Identifica cuáles necesitan respuesta.\n\n"
-            "RESULTADO: Dame un resumen agrupado por plataforma (Telegram / WhatsApp). "
-            "Para cada chat que necesita respuesta, incluye: quién escribió, de qué trata, y un borrador concreto de respuesta. "
-            "Para canales informativos (sin conversación), solo un resumen breve de lo más relevante. "
-            "Usa guiones simples para listas, sin asteriscos ni negritas."
+            "Para TODOS los chats con mensajes sin leer o con 'sin preview', llama read_whatsapp_chat_history para ver el contenido real. "
+            "Identifica cuáles necesitan respuesta.\n\n"
+            "RESULTADO: Resumen agrupado por plataforma (Telegram / WhatsApp). "
+            "Para cada chat que necesita respuesta: quién escribió, de qué trata, borrador de respuesta. "
+            "Para canales informativos: resumen breve de lo más relevante. "
+            "Usa guiones simples, sin asteriscos ni negritas."
         )
 
         response = await self.brain.think(
