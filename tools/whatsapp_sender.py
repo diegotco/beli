@@ -182,6 +182,18 @@ def read_whatsapp_chats(
 
 # ── Tool 3: Read chat history ─────────────────────────────────────────────────
 
+def _download_media(waha_url: str, message_id: str, session: str, api_key: str) -> bytes | None:
+    """Downloads media bytes for a given WAHA message ID. Returns None on failure."""
+    try:
+        url = f"{waha_url.rstrip('/')}/api/{session}/messages/{message_id}/download"
+        resp = requests.get(url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
+        resp.raise_for_status()
+        return resp.content
+    except Exception as e:
+        logger.warning(f"[WhatsApp] Could not download media for message {message_id}: {e}")
+        return None
+
+
 def read_whatsapp_chat_history(
     waha_url: str,
     phone_or_name: str,
@@ -189,6 +201,7 @@ def read_whatsapp_chat_history(
     session: str = _DEFAULT_SESSION,
     api_key: str = "",
     timezone: str = "America/Mexico_City",
+    groq_api_key: str = "",
 ) -> str:
     """
     Reads the recent message history of a specific WhatsApp chat.
@@ -230,7 +243,7 @@ def read_whatsapp_chat_history(
     try:
         resp = requests.get(
             url,
-            params={"limit": limit, "downloadMedia": "false"},
+            params={"limit": limit, "downloadMedia": "true"},
             headers=_headers(api_key),
             timeout=_REQUEST_TIMEOUT,
         )
@@ -240,22 +253,62 @@ def read_whatsapp_chat_history(
         if not messages:
             return f"No encontré mensajes en el chat con '{phone_or_name}'."
 
+        import datetime, zoneinfo
+        try:
+            tz_info = zoneinfo.ZoneInfo(timezone)
+        except Exception:
+            tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
+
+        # Lazy-import transcriber only if we'll need it
+        transcriber = None
+        if groq_api_key:
+            try:
+                from tools.transcriber import transcribe_audio
+                transcriber = transcribe_audio
+            except ImportError:
+                logger.warning("[WhatsApp] transcriber module not available")
+
         lines = []
         for msg in reversed(messages):
-            body    = msg.get("body") or msg.get("caption") or "[media]"
-            from_me = msg.get("fromMe", False)
-            sender  = "Tú" if from_me else phone_or_name.split()[0]
-            ts      = msg.get("timestamp", "")
+            msg_type = msg.get("type", "")
+            has_media = msg.get("hasMedia", False)
+            from_me   = msg.get("fromMe", False)
+            sender    = "Tú" if from_me else phone_or_name.split()[0]
+
+            ts = msg.get("timestamp", "")
             if ts:
-                import datetime, zoneinfo
-                try:
-                    tz_info = zoneinfo.ZoneInfo(timezone)
-                except Exception:
-                    tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
                 dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d %b %H:%M")
             else:
                 dt = ""
-            lines.append(f"[{dt}] {sender}: {body[:120]}")
+
+            # Audio / voice note — transcribe if Groq key is available
+            if msg_type in ("ptt", "audio") and has_media and transcriber:
+                msg_id    = msg.get("id", "")
+                media_url = msg.get("mediaUrl") or msg.get("_data", {}).get("mediaUrl")
+
+                audio_bytes = None
+                if media_url:
+                    try:
+                        audio_resp = requests.get(media_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
+                        audio_resp.raise_for_status()
+                        audio_bytes = audio_resp.content
+                    except Exception as e:
+                        logger.warning(f"[WhatsApp] Direct mediaUrl download failed: {e}")
+
+                if not audio_bytes and msg_id:
+                    audio_bytes = _download_media(waha_url, msg_id, session, api_key)
+
+                if audio_bytes:
+                    filename = "voice.ogg" if msg_type == "ptt" else "audio.ogg"
+                    text = transcriber(groq_api_key, audio_bytes, filename)
+                    body = f"[Audio] {text}" if not text.startswith("ERROR:") else "[audio — no se pudo transcribir]"
+                else:
+                    body = "[audio — no se pudo descargar]"
+
+            else:
+                body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")
+
+            lines.append(f"[{dt}] {sender}: {body[:200]}")
 
         return f"Últimos {len(lines)} mensajes con '{phone_or_name}':\n\n" + "\n".join(lines)
 

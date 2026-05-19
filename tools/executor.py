@@ -73,6 +73,7 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             session=config.WAHA_SESSION,
             api_key=config.WAHA_API_KEY,
             timezone=tz,
+            groq_api_key=config.GROQ_API_KEY,
         )
 
     if tool_name == "send_email":
