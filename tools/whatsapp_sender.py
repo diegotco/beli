@@ -14,7 +14,7 @@ import requests
 logger = logging.getLogger("beli.tools.whatsapp")
 
 _DEFAULT_SESSION = "default"
-_REQUEST_TIMEOUT = 15  # seconds
+_REQUEST_TIMEOUT = 30  # seconds
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
