@@ -63,11 +63,6 @@ class Config:
     OWNER_SESSION_PATH: str = str(DATA_DIR / "telethon_session")
     OWNER_SESSION_STRING: str = os.getenv("OWNER_SESSION_STRING", "")
 
-    # Beli's own Telegram account — used to send & receive messages
-    BELI_TELEGRAM_PHONE: str = os.getenv("BELI_TELEGRAM_PHONE", "")
-    BELI_SESSION_PATH: str = str(DATA_DIR / "beli_session")
-    BELI_SESSION_STRING: str = os.getenv("BELI_SESSION_STRING", "")
-
     # AgentMail (Beli's own email: beli@agentmail.to)
     AGENTMAIL_API_KEY: str = os.getenv("AGENTMAIL_API_KEY", "")
     AGENTMAIL_INBOX_ID: str = os.getenv("AGENTMAIL_INBOX_ID", "beli")

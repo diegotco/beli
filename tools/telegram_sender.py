@@ -1,9 +1,11 @@
 """
 tools/telegram_sender.py - Telegram contact search and message sending via Telethon.
 
-Two-step flow for safety:
-  1. find_telegram_contact() → returns match details for the owner to confirm
-  2. send_telegram_message()  → sends using the confirmed telegram_id, then caches
+Flow:
+  1. find_telegram_contact() → searches owner's contacts, returns who was found
+  2. send_as_owner()         → sends FROM the owner's personal account (ghost mode)
+  3. read_telegram_chats()   → overview of recent conversations
+  4. read_chat_history()     → full history of a specific chat
 """
 import json
 import logging
@@ -14,35 +16,20 @@ import datetime
 from telethon import TelegramClient
 from telethon.errors import FloodWaitError, UsernameNotOccupiedError
 from telethon.sessions import StringSession
-from telethon.tl.functions.contacts import GetContactsRequest, ImportContactsRequest
-from telethon.tl.types import InputPhoneContact, User, Channel, Chat
+from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.types import User, Channel, Chat
 
 logger = logging.getLogger("beli.tools.telegram_sender")
 
 _OWNER_SESSION_PATH = str(Path(__file__).parent.parent / "data" / "telethon_session")
-_BELI_SESSION_PATH  = str(Path(__file__).parent.parent / "data" / "beli_session")
 _CACHE_PATH         = Path(__file__).parent.parent / "data" / "contact_cache.json"
 
-# Shared Beli client — set by BeliListener on startup so send_telegram_message
-# reuses the already-open connection instead of creating a second one.
-_shared_beli_client = None
 
 def _owner_client(api_id: int, api_hash: str) -> TelegramClient:
     """Returns a TelegramClient for the owner's account (StringSession in cloud, file locally)."""
     from config import config
     session = StringSession(config.OWNER_SESSION_STRING) if config.OWNER_SESSION_STRING else _OWNER_SESSION_PATH
     return TelegramClient(session, api_id, api_hash)
-
-def _beli_client(api_id: int, api_hash: str) -> TelegramClient:
-    """Returns a TelegramClient for Beli's account (StringSession in cloud, file locally)."""
-    from config import config
-    session = StringSession(config.BELI_SESSION_STRING) if config.BELI_SESSION_STRING else _BELI_SESSION_PATH
-    return TelegramClient(session, api_id, api_hash)
-
-def set_shared_beli_client(client) -> None:
-    global _shared_beli_client
-    _shared_beli_client = client
-    logger.info("Shared Beli Telegram client registered.")
 
 
 # ── Cache helpers ────────────────────────────────────────────────────────────
@@ -93,7 +80,7 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
                 f"(nickname='{nick}', telegram_id={tid}"
                 f"{', @' + uname if uname else ''}). "
                 f"Envía el mensaje directamente con "
-                f"send_telegram_message(nickname='{nick}', message='...'). "
+                f"send_as_owner(nickname='{nick}', message='...'). "
                 f"NO pidas confirmación — ya fue confirmado antes."
             )
 
@@ -151,116 +138,7 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
         return f"Error al buscar en los contactos de Telegram: {e}"
 
 
-# ── Tool 2: Send message ─────────────────────────────────────────────────────
-
-async def send_telegram_message(
-    api_id: int,
-    api_hash: str,
-    nickname: str,
-    message: str,
-    telegram_id: int | None = None,
-    contact_phone: str | None = None,
-    username: str | None = None,
-) -> str:
-    """
-    Sends a Telegram message using:
-    - telegram_id (int): direct Telegram user ID
-    - username (str): @username, works for users AND bots (e.g. '@some_bot')
-    - contact_phone (str): phone in international format e.g. '+15550001234'
-    - nickname only: looks up in cache
-    """
-    cache = _load_cache()
-    cached = cache.get(nickname.lower())
-
-    # Normalize username — strip leading @ if present
-    if username:
-        username = username.lstrip("@")
-
-    # Resolve identifier — prefer explicit args, fall back to cache
-    if telegram_id:
-        identifier = int(telegram_id)
-        logger.info(f"Using telegram_id={telegram_id} for '{nickname}'")
-    elif username:
-        identifier = username          # Telethon resolves @username natively
-        logger.info(f"Using username=@{username} for '{nickname}'")
-    elif contact_phone:
-        identifier = contact_phone
-        logger.info(f"Using phone={contact_phone} for '{nickname}'")
-    elif cached:
-        if cached.get("telegram_id"):
-            identifier = int(cached["telegram_id"])
-        elif cached.get("username"):
-            identifier = cached["username"]
-        elif cached.get("phone"):
-            identifier = cached["phone"]
-        else:
-            return f"El contacto '{nickname}' está en caché pero sin ID, @username ni teléfono. Usa find_telegram_contact de nuevo."
-        logger.info(f"Cache hit: '{nickname}' → {cached['name']} ({identifier})")
-    else:
-        return (
-            f"No tengo forma de contactar a '{nickname}'. "
-            f"Proporciona telegram_id, @username, o teléfono."
-        )
-
-    # Phone number to use as fallback (for new accounts with no prior contact history)
-    phone_fallback = contact_phone or (cached or {}).get("phone", "") if cached else contact_phone
-
-    async def _do_send(client) -> str:
-        nonlocal identifier
-        try:
-            entity = await client.get_entity(identifier)
-        except Exception as e:
-            # Beli's account is new — it may lack the access_hash for this user.
-            # Import via phone number to resolve the entity.
-            if phone_fallback:
-                logger.info(f"get_entity failed ({e}), trying phone import: {phone_fallback}")
-                # Use real name from cache; fall back to nickname
-                cached_name = (cached or {}).get("name", "") or nickname.capitalize()
-                name_parts  = cached_name.split()
-                first       = name_parts[0] if name_parts else nickname.capitalize()
-                last        = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
-                result = await client(ImportContactsRequest([
-                    InputPhoneContact(client_id=0, phone=phone_fallback, first_name=first, last_name=last)
-                ]))
-                if result.users:
-                    entity = result.users[0]
-                else:
-                    return f"No se pudo resolver el contacto. Verifica que el número {phone_fallback} esté en Telegram."
-            else:
-                raise
-        await client.send_message(entity, message)
-
-        full_name = f"{getattr(entity, 'first_name', '') or ''} {getattr(entity, 'last_name', '') or ''}".strip()
-        username  = getattr(entity, "username", "") or ""
-        entity_id = getattr(entity, "id", None)
-
-        _save_to_cache(
-            nickname=nickname,
-            name=full_name,
-            telegram_id=entity_id,
-            username=username,
-            phone=contact_phone or (cached or {}).get("phone", ""),
-        )
-        logger.info(f"Message sent to {full_name} (id={entity_id})")
-        return f"✓ ENVIADO EXITOSAMENTE a {full_name} ({'@'+username if username else contact_phone or 'sin @username'})."
-
-    try:
-        # Prefer the shared client (already open by the listener) to avoid session lock
-        if _shared_beli_client and _shared_beli_client.is_connected():
-            logger.info("Using shared Beli client for sending.")
-            return await _do_send(_shared_beli_client)
-        else:
-            async with _beli_client(api_id, api_hash) as client:
-                return await _do_send(client)
-
-    except FloodWaitError as e:
-        return f"Telegram pidió esperar {e.seconds} segundos antes de enviar más mensajes."
-    except Exception as e:
-        logger.exception(f"Error sending message ({identifier}): {e}")
-        return f"Error al enviar el mensaje: {e}"
-
-
-# ── Tool 3: Read recent chats (overview) ────────────────────────────────────
+# ── Tool 2: Send as owner (ghost mode) ───────────────────────────────────────
 
 async def send_as_owner(
     api_id: int,

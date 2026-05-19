@@ -23,50 +23,6 @@ TOOLS = [
         },
     },
     {
-        "name": "send_telegram_message",
-        "description": (
-            "Sends a Telegram message to a contact. "
-            "ALWAYS try this tool first using just the nickname — if the contact was confirmed before, "
-            "it will send immediately without needing anything else. "
-            "Only call find_telegram_contact if this tool returns an error saying the contact is not found. "
-            "If you already know the @username (e.g. from a screenshot), pass it directly via the 'username' field — "
-            "no need to call find_telegram_contact at all."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "nickname": {
-                    "type": "string",
-                    "description": "The owner's nickname for this contact (e.g. 'mom', 'boss'). Used as cache key.",
-                },
-                "telegram_id": {
-                    "type": "integer",
-                    "description": "Telegram user ID returned by find_telegram_contact. Use when available.",
-                },
-                "username": {
-                    "type": "string",
-                    "description": (
-                        "Telegram @username of the recipient (e.g. '@some_bot' or 'some_bot'). "
-                        "Works for regular users AND bots. Use this whenever you know the @username — "
-                        "it is the most reliable identifier and does NOT require the person to be in the owner's contacts."
-                    ),
-                },
-                "contact_phone": {
-                    "type": "string",
-                    "description": (
-                        "Phone number in international format (e.g. '+15550001234'). "
-                        "Use this when the contact has no @username and no telegram_id."
-                    ),
-                },
-                "message": {
-                    "type": "string",
-                    "description": "The exact message text to send.",
-                },
-            },
-            "required": ["nickname", "message"],
-        },
-    },
-    {
         "name": "read_telegram_chats",
         "description": (
             "Reads the owner's most recent Telegram conversations and returns a summary. "
