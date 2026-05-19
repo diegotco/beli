@@ -53,11 +53,13 @@ class _HealthHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(b"OK")
 
+        # Access via class, not self — avoids Python descriptor binding
+        # (self.callback would bind the handler instance as first arg)
         callback = None
         if self.path == "/whatsapp/webhook":
-            callback = self.whatsapp_callback
+            callback = _HealthHandler.whatsapp_callback
         elif self.path == "/email/webhook":
-            callback = self.email_callback
+            callback = _HealthHandler.email_callback
 
         if callback:
             try:
