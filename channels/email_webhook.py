@@ -24,20 +24,39 @@ def handle_email_webhook(
     Called from the HTTP server thread — must be synchronous.
     """
     try:
-        event_type = payload.get("event_type", "")
+        # Log the full payload for debugging (truncated to 500 chars)
+        logger.info(f"[Email] Webhook received: {str(payload)[:500]}")
 
-        # Only handle incoming messages
-        if event_type != "message.received":
-            logger.debug(f"[Email] Ignoring event type: {event_type}")
+        # AgentMail may use 'event_type', 'type', or 'event' as the key
+        event_type = (
+            payload.get("event_type")
+            or payload.get("type")
+            or payload.get("event")
+            or ""
+        )
+
+        # Only handle incoming messages; accept "message.received" or any non-empty event
+        if event_type and event_type != "message.received":
+            logger.info(f"[Email] Ignoring event type: {event_type!r}")
             return
 
-        message = payload.get("message", {})
+        # Message data may be nested under 'message' or at the top level
+        message = payload.get("message") or payload
 
-        sender  = message.get("from", "Desconocido")
+        # 'from' may be a string "Name <email>" or an object {"name": ..., "address": ...}
+        raw_from = message.get("from") or message.get("sender") or "Desconocido"
+        if isinstance(raw_from, dict):
+            name  = raw_from.get("name") or ""
+            addr  = raw_from.get("address") or raw_from.get("email") or ""
+            sender = f"{name} <{addr}>".strip(" <>") if name else addr or "Desconocido"
+        else:
+            sender = str(raw_from)
+
         subject = message.get("subject") or "(sin asunto)"
         # Prefer full text; fall back to preview
         body    = (
             message.get("text")
+            or message.get("body")
             or message.get("extracted_text")
             or message.get("preview")
             or ""
