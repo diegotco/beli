@@ -109,13 +109,21 @@ def handle_webhook(
         msg_type    = msg.get("type", "")
         has_media   = msg.get("hasMedia", False)
         msg_id      = msg.get("id", "")
+        is_group    = chat_id.endswith("@g.us")
+
+        # For group messages the individual sender is in 'author' or 'from';
+        # 'chatId' is the group ID, not the sender.
+        sender_jid = (
+            msg.get("author")
+            or msg.get("from")
+            or (chat_id if not is_group else "")
+        )
         sender_name = (
             msg.get("_data", {}).get("notifyName")
             or msg.get("notifyName")
-            or chat_id.replace("@c.us", "").replace("@g.us", "")
+            or sender_jid.replace("@c.us", "").replace("@g.us", "")
             or "Desconocido"
         )
-        is_group = chat_id.endswith("@g.us")
 
         # For groups, try to resolve the group name via WAHA API
         group_name = None
@@ -180,14 +188,26 @@ def handle_webhook(
 
         # ── Build and send notification ───────────────────────────────────────
 
-        first_name       = sender_name.split()[0] if sender_name else "esta persona"
-        chat_id_display  = chat_id.replace("@c.us", "").replace("@g.us", "")
+        first_name = sender_name.split()[0] if sender_name else "esta persona"
 
-        notification = (
-            f"Mensaje de {sender_name} por {channel_label}:\n\n"
-            f"{body}\n\n"
-            f"Para responder: \"respóndele por WhatsApp a {first_name}: [tu mensaje]\""
-        )
+        if is_group and group_name:
+            notification = (
+                f"WhatsApp Grupo: {group_name}\n"
+                f"{sender_name}: {body}\n\n"
+                f"Para responder: \"respóndele por WhatsApp en {group_name} a {first_name}: [tu mensaje]\""
+            )
+        elif is_group:
+            notification = (
+                f"WhatsApp Grupo\n"
+                f"{sender_name}: {body}\n\n"
+                f"Para responder: \"respóndele por WhatsApp a {first_name}: [tu mensaje]\""
+            )
+        else:
+            notification = (
+                f"Mensaje de {sender_name} por WhatsApp:\n\n"
+                f"{body}\n\n"
+                f"Para responder: \"respóndele por WhatsApp a {first_name}: [tu mensaje]\""
+            )
 
         _send_telegram(bot_token, owner_chat_id, notification)
 
