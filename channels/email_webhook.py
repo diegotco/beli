@@ -128,10 +128,13 @@ async def _process_with_brain(
 
         system_prompt = get_system_prompt(extra_context=facts)
 
-        # Present the email as a message from the owner to Beli
+        # Present the email as a message from the owner to Beli.
+        # Explicit hint so Claude uses tools proactively (calendar, etc.)
         email_message = (
             f"[Email de {sender} — Asunto: {subject}]\n\n"
-            f"{body}"
+            f"{body}\n\n"
+            f"(Si el correo contiene una solicitud de acción — crear evento, enviar mensaje, "
+            f"buscar información — ejecútala directamente usando las herramientas disponibles.)"
         )
 
         response = await brain.think(

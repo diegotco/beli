@@ -44,7 +44,9 @@ def _transcribe(groq_api_key: str, audio_bytes: bytes, filename: str = "voice.og
 def _get_group_name(waha_url: str, session: str, api_key: str, group_id: str) -> str | None:
     """Fetches the group name from WAHA. Returns None on failure."""
     try:
-        url  = f"{waha_url.rstrip('/')}/api/{session}/chats/{group_id}"
+        from urllib.parse import quote
+        encoded_id = quote(group_id, safe="")  # encodes '@' → '%40'
+        url  = f"{waha_url.rstrip('/')}/api/{session}/chats/{encoded_id}"
         hdrs = {"X-Api-Key": api_key} if api_key else {}
         resp = requests.get(url, headers=hdrs, timeout=10)
         resp.raise_for_status()
