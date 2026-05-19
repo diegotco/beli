@@ -84,11 +84,11 @@ def _resolve_chat_id(
         )
         if match:
             return match["id"], _display_name(match)
+        # Name not found in chats — signal as error so we don't send to a garbage ID
+        return None, f"No se encontró ningún chat llamado '{recipient}' en WhatsApp."
     except Exception as e:
         logger.warning(f"[WhatsApp] Name lookup failed for '{recipient}': {e}")
-
-    # Fallback: treat as individual contact ID (will likely fail, but surfaces the error)
-    return f"{stripped}@c.us", recipient
+        return None, f"Error al buscar el chat '{recipient}': {e}"
 
 
 def send_whatsapp_message(
@@ -109,6 +109,11 @@ def send_whatsapp_message(
         session:   WAHA session name (default: 'default')
     """
     chat_id, display_label = _resolve_chat_id(waha_url, recipient, session, api_key)
+
+    # If resolution failed, surface the error immediately — don't try to send
+    if chat_id is None:
+        logger.error(f"[WhatsApp] Could not resolve recipient '{recipient}': {display_label}")
+        return f"Error: {display_label}"
 
     url     = f"{waha_url.rstrip('/')}/api/sendText"
     payload = {"session": session, "chatId": chat_id, "text": message}
