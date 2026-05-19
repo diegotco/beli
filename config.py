@@ -75,8 +75,15 @@ class Config:
     # Groq (voice note transcription via Whisper)
     GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 
-    # Owner's Telegram chat ID (used for WhatsApp webhook notifications)
+    # Owner's Telegram chat ID (used for WhatsApp/email webhook notifications)
     OWNER_TELEGRAM_CHAT_ID: int = int(os.getenv("OWNER_TELEGRAM_CHAT_ID", "0"))
+
+    # Public URL of this Beli instance (used to auto-register webhooks)
+    # e.g. https://web-production-f3c9e.up.railway.app
+    BELI_PUBLIC_URL: str = os.getenv("BELI_PUBLIC_URL", "")
+
+    # Google Calendar (OAuth credentials JSON, obtained via setup_google_calendar.py)
+    GOOGLE_CALENDAR_CREDENTIALS: str = os.getenv("GOOGLE_CALENDAR_CREDENTIALS", "")
 
     # Memory
     MEMORY_WINDOW: int = int(os.getenv("MEMORY_WINDOW", "20"))

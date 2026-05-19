@@ -44,6 +44,11 @@ class TelegramChannel:
         reminder_hour: int = 9,
         reminder_minute: int = 0,
         reminder_days_before_end: int = 4,
+        # Telethon listener params (optional — proactive notifications)
+        telegram_api_id: int = 0,
+        telegram_api_hash: str = "",
+        owner_session_string: str = "",
+        owner_chat_id: int = 0,
     ):
         self.token = token
         self.brain = brain
@@ -53,7 +58,14 @@ class TelegramChannel:
         self.reminder_hour = reminder_hour
         self.reminder_minute = reminder_minute
         self.reminder_days_before_end = reminder_days_before_end
-        self.app = Application.builder().token(token).build()
+
+        # Listener config
+        self._tg_api_id         = telegram_api_id
+        self._tg_api_hash       = telegram_api_hash
+        self._owner_session     = owner_session_string
+        self._owner_chat_id     = owner_chat_id
+
+        self.app = Application.builder().token(token).post_init(self._post_init).build()
         self._register_handlers()
 
     def _register_handlers(self) -> None:
@@ -447,12 +459,29 @@ class TelegramChannel:
     # START
     # ------------------------------------------------------------------
 
+    async def _post_init(self, application) -> None:
+        """Called by PTB after the bot is initialized but before polling starts."""
+        if self._tg_api_id and self._tg_api_hash and self._owner_chat_id:
+            from channels.telegram_listener import run_listener
+            asyncio.create_task(
+                run_listener(
+                    api_id=self._tg_api_id,
+                    api_hash=self._tg_api_hash,
+                    session_string=self._owner_session,
+                    bot_token=self.token,
+                    owner_chat_id=self._owner_chat_id,
+                )
+            )
+            logger.info("Telegram proactive listener started.")
+        else:
+            logger.info("Telegram listener disabled (missing api_id/api_hash/owner_chat_id).")
+
     def run(self) -> None:
         """Starts the bot in polling mode (for local use)."""
         logger.info("Starting Beli on Telegram (polling mode)...")
         self.app.run_polling(
             allowed_updates=Update.ALL_TYPES,
-            drop_pending_updates=True,  # Ignore messages that accumulated while offline
+            drop_pending_updates=True,
         )
 
 

@@ -218,4 +218,60 @@ TOOLS = [
             "required": ["timezone", "location_name"],
         },
     },
+    {
+        "name": "read_calendar_events",
+        "description": (
+            "Reads upcoming events from the owner's primary Google Calendar. "
+            "Use this when the owner asks about their schedule, agenda, or upcoming events. "
+            "Returns a list of events with title, date/time, and location."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "days_ahead": {
+                    "type": "integer",
+                    "description": "How many days ahead to look. Default 7. Use 1 for today, 30 for the month.",
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of events to return. Default 20.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "create_calendar_event",
+        "description": (
+            "Creates a new event in the owner's primary Google Calendar. "
+            "Use this when the owner asks to schedule, add, or block time for something. "
+            "Always confirm the title, date, and time with the owner before calling."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Event title/summary.",
+                },
+                "start_datetime": {
+                    "type": "string",
+                    "description": "Start date and time in ISO 8601 format, e.g. '2026-05-20T10:00:00'.",
+                },
+                "end_datetime": {
+                    "type": "string",
+                    "description": "End date and time in ISO 8601 format, e.g. '2026-05-20T11:00:00'.",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Optional event description or notes.",
+                },
+                "location": {
+                    "type": "string",
+                    "description": "Optional event location.",
+                },
+            },
+            "required": ["title", "start_datetime", "end_datetime"],
+        },
+    },
 ]

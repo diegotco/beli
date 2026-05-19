@@ -8,6 +8,7 @@ from config import config
 from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history
 from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history
 from tools.email_sender import send_email
+from tools.calendar_tool import read_calendar_events, create_calendar_event
 
 logger = logging.getLogger("beli.tools.executor")
 
@@ -120,6 +121,27 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             except Exception:
                 return f"Invalid timezone '{tz}'."
         return "No se pudo actualizar el timezone."
+
+    if tool_name == "read_calendar_events":
+        tz = await _get_timezone()
+        return read_calendar_events(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            days_ahead=tool_input.get("days_ahead", 7),
+            max_results=tool_input.get("max_results", 20),
+            timezone=tz,
+        )
+
+    if tool_name == "create_calendar_event":
+        tz = await _get_timezone()
+        return create_calendar_event(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            title=tool_input.get("title", ""),
+            start_datetime=tool_input.get("start_datetime", ""),
+            end_datetime=tool_input.get("end_datetime", ""),
+            description=tool_input.get("description", ""),
+            location=tool_input.get("location", ""),
+            timezone=tz,
+        )
 
     logger.warning(f"Unknown tool called: {tool_name}")
     return f"Tool '{tool_name}' is not implemented yet."
