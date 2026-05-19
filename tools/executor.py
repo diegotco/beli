@@ -104,5 +104,19 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             limit=tool_input.get("limit", 5),
         )
 
+    if tool_name == "set_timezone":
+        tz = tool_input.get("timezone", "")
+        location = tool_input.get("location_name", tz)
+        if _memory and tz:
+            import zoneinfo
+            try:
+                zoneinfo.ZoneInfo(tz)
+                await _memory.save_setting("timezone", tz)
+                logger.info(f"Timezone updated to: {tz}")
+                return f"Timezone updated to {tz} ({location})."
+            except Exception:
+                return f"Invalid timezone '{tz}'."
+        return "No se pudo actualizar el timezone."
+
     logger.warning(f"Unknown tool called: {tool_name}")
     return f"Tool '{tool_name}' is not implemented yet."

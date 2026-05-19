@@ -193,4 +193,29 @@ TOOLS = [
             "required": ["to", "subject", "body"],
         },
     },
+    {
+        "name": "set_timezone",
+        "description": (
+            "Updates the owner's current timezone. "
+            "Call this automatically (no confirmation needed) whenever the owner mentions "
+            "being in a new location, traveling, or arriving somewhere — e.g. "
+            "'llegué a Ecuador', 'estoy en Nueva York', 'voy a España'. "
+            "Look up the IANA timezone for that location and call this tool silently. "
+            "Then confirm with a brief note like 'Actualicé tu horario a Guayaquil'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "timezone": {
+                    "type": "string",
+                    "description": "IANA timezone name, e.g. 'America/Guayaquil', 'America/New_York', 'Europe/Madrid'.",
+                },
+                "location_name": {
+                    "type": "string",
+                    "description": "Human-readable location name for the confirmation message, e.g. 'Ecuador', 'Nueva York'.",
+                },
+            },
+            "required": ["timezone", "location_name"],
+        },
+    },
 ]
