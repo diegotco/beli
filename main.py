@@ -4,6 +4,7 @@ main.py - Entry point for Beli.
 Run with:  python main.py
 """
 import asyncio
+import json
 import logging
 import os
 import threading
@@ -13,13 +14,22 @@ from config import config
 from brain.claude_client import BelisBrain
 from memory.manager import MemoryManager
 from channels.telegram import TelegramChannel
+from channels.whatsapp_webhook import handle_webhook
+from tools.executor import set_memory
 
 logger = logging.getLogger("beli.main")
 
 # ── Health check HTTP server ─────────────────────────────────────────────────
 
 class _HealthHandler(BaseHTTPRequestHandler):
-    """Tiny HTTP handler: GET /health → 200 OK. Everything else → 404."""
+    """
+    HTTP handler for Beli's embedded web server.
+      GET  /health              → 200 OK  (used by GitHub Actions health check)
+      POST /whatsapp/webhook    → 200 OK  (receives events from WAHA)
+    """
+
+    # Set by _start_health_server() after the bot is ready
+    whatsapp_callback = None  # callable(payload: dict) -> None
 
     def do_GET(self):  # noqa: N802
         if self.path == "/health":
@@ -31,7 +41,32 @@ class _HealthHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, fmt, *args):  # suppress access logs to keep output clean
+    def do_POST(self):  # noqa: N802
+        if self.path == "/whatsapp/webhook":
+            length  = int(self.headers.get("Content-Length", 0))
+            body    = self.rfile.read(length)
+            # Always respond 200 immediately so WAHA doesn't retry
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK")
+            # Process asynchronously to avoid blocking the HTTP thread
+            if self.whatsapp_callback:
+                try:
+                    payload = json.loads(body)
+                    t = threading.Thread(
+                        target=self.whatsapp_callback,
+                        args=(payload,),
+                        daemon=True,
+                    )
+                    t.start()
+                except Exception as e:
+                    logger.error(f"WhatsApp webhook parse error: {e}")
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, fmt, *args):  # suppress access logs
         pass
 
 
@@ -59,6 +94,7 @@ async def startup() -> None:
         window_size=config.MEMORY_WINDOW,
     )
     await memory.initialize()
+    set_memory(memory)  # Give executor access to user preferences (e.g. timezone)
 
     # Initialize the brain (Claude)
     brain = BelisBrain(
@@ -86,7 +122,21 @@ def main() -> None:
         reminder_days_before_end=config.REMINDER_DAYS_BEFORE_END,
     )
 
-    # Start lightweight health-check server (used by UptimeRobot / Railway)
+    # Wire up WhatsApp webhook callback
+    owner_chat_id = int(os.getenv("OWNER_TELEGRAM_CHAT_ID", "0"))
+    if owner_chat_id and config.WAHA_URL:
+        def _on_whatsapp(payload: dict) -> None:
+            handle_webhook(
+                payload=payload,
+                bot_token=config.TELEGRAM_BOT_TOKEN,
+                owner_chat_id=owner_chat_id,
+            )
+        _HealthHandler.whatsapp_callback = _on_whatsapp
+        logger.info("WhatsApp webhook handler registered.")
+    else:
+        logger.info("WhatsApp webhook disabled (WAHA_URL or OWNER_TELEGRAM_CHAT_ID not set).")
+
+    # Start lightweight health-check server (used by GitHub Actions / Railway)
     _start_health_server()
 
     logger.info("Beli is ready. Waiting for messages on Telegram...")

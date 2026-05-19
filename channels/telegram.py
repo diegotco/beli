@@ -64,6 +64,7 @@ class TelegramChannel:
         self.app.add_handler(CommandHandler("memoria", self._cmd_memory))
         self.app.add_handler(CommandHandler("contactos", self._cmd_contacts))
         self.app.add_handler(CommandHandler("digest", self._cmd_digest))
+        self.app.add_handler(CommandHandler("timezone", self._cmd_timezone))
         # Hourly fact extraction job
         self.app.job_queue.run_repeating(
             self._job_extract_facts,
@@ -120,16 +121,44 @@ class TelegramChannel:
 
     async def _cmd_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Shows the help message."""
+        tz = await self.memory.get_setting("timezone", "America/Mexico_City")
         help_text = (
             "Soy Beli, tu asistente personal con IA.\n\n"
             "Comandos:\n"
-            "  /digest  — resumen de tus chats recientes de Telegram y WhatsApp con sugerencias de respuesta\n"
-            "  /borrar  — borra el historial de conversación\n"
-            "  /memoria — muestra los hechos que recuerdo sobre ti\n"
-            "  /ayuda   — muestra esta ayuda\n\n"
+            "  /digest             — resumen de tus chats recientes de Telegram y WhatsApp\n"
+            "  /timezone <zona>    — cambia tu zona horaria (actual: " + tz + ")\n"
+            "  /borrar             — borra el historial de conversación\n"
+            "  /memoria            — muestra los hechos que recuerdo sobre ti\n"
+            "  /ayuda              — muestra esta ayuda\n\n"
+            "Ejemplos de zona horaria: America/Mexico_City, America/Guayaquil, America/New_York\n\n"
             "Simplemente escríbeme lo que necesites 💬"
         )
         await update.message.reply_text(help_text)
+
+    async def _cmd_timezone(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Sets the user's preferred timezone."""
+        import zoneinfo
+        args = context.args
+        if not args:
+            tz = await self.memory.get_setting("timezone", "America/Mexico_City")
+            await update.message.reply_text(
+                f"Zona horaria actual: {tz}\n\n"
+                "Para cambiarla: /timezone America/Guayaquil\n"
+                "Otras opciones: America/New_York, Europe/Madrid, America/Bogota"
+            )
+            return
+        tz_name = args[0]
+        try:
+            zoneinfo.ZoneInfo(tz_name)  # Validate
+        except zoneinfo.ZoneInfoNotFoundError:
+            await update.message.reply_text(
+                f"'{tz_name}' no es una zona horaria válida.\n"
+                "Ejemplos: America/Guayaquil, America/New_York, Europe/Madrid"
+            )
+            return
+        await self.memory.save_setting("timezone", tz_name)
+        logger.info(f"Timezone updated to: {tz_name}")
+        await update.message.reply_text(f"Zona horaria actualizada a {tz_name} ✓")
 
     async def _cmd_contacts(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Shows the cached Telegram contact mappings."""
@@ -162,9 +191,11 @@ class TelegramChannel:
         facts   = await self.memory.get_facts(CHANNEL, user_id)
         extra   = "\n".join(f"- {f}" for f in facts) if facts else ""
         system  = get_system_prompt(extra)
+        tz      = await self.memory.get_setting("timezone", "America/Mexico_City")
 
         prompt = (
-            "Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp.\n\n"
+            f"Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp. "
+            f"Muestra las horas en zona horaria {tz}.\n\n"
             "PASO 1 — Telegram: llama read_telegram_chats con limit=20. "
             "Para TODOS los chats que tengan mensajes sin leer (unread > 0) o actividad reciente de personas (no solo canales), "
             "llama read_chat_history para ver el contexto. Identifica cuáles necesitan respuesta de mi parte.\n\n"

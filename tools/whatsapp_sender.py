@@ -188,6 +188,7 @@ def read_whatsapp_chat_history(
     limit: int = 30,
     session: str = _DEFAULT_SESSION,
     api_key: str = "",
+    timezone: str = "America/Mexico_City",
 ) -> str:
     """
     Reads the recent message history of a specific WhatsApp chat.
@@ -246,8 +247,12 @@ def read_whatsapp_chat_history(
             sender  = "Tú" if from_me else phone_or_name.split()[0]
             ts      = msg.get("timestamp", "")
             if ts:
-                import datetime
-                dt = datetime.datetime.fromtimestamp(ts).strftime("%d %b %H:%M")
+                import datetime, zoneinfo
+                try:
+                    tz_info = zoneinfo.ZoneInfo(timezone)
+                except Exception:
+                    tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
+                dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d %b %H:%M")
             else:
                 dt = ""
             lines.append(f"[{dt}] {sender}: {body[:120]}")

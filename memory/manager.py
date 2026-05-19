@@ -57,6 +57,13 @@ class MemoryManager:
                     last_seen  TEXT DEFAULT (datetime('now'))
                 )
             """)
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key        TEXT PRIMARY KEY,
+                    value      TEXT NOT NULL,
+                    updated_at TEXT DEFAULT (datetime('now'))
+                )
+            """)
             # Index to speed up per-user lookups
             await db.execute("""
                 CREATE INDEX IF NOT EXISTS idx_conversations_user
@@ -202,6 +209,28 @@ class MemoryManager:
             async with db.execute("SELECT chat_id FROM telegram_chats") as cursor:
                 rows = await cursor.fetchall()
         return [row["chat_id"] for row in rows]
+
+    async def get_setting(self, key: str, default: str = "") -> str:
+        """Returns a global setting value, or default if not set."""
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT value FROM settings WHERE key = ?", (key,)
+            ) as cursor:
+                row = await cursor.fetchone()
+        return row["value"] if row else default
+
+    async def save_setting(self, key: str, value: str) -> None:
+        """Saves or updates a global setting."""
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                """
+                INSERT INTO settings (key, value) VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = datetime('now')
+                """,
+                (key, value),
+            )
+            await db.commit()
 
     async def clear_history(self, channel: str, user_id: str) -> int:
         """Clears a user's conversation history. Returns the number of messages deleted."""

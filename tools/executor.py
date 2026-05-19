@@ -11,6 +11,19 @@ from tools.email_sender import send_email
 
 logger = logging.getLogger("beli.tools.executor")
 
+# Lazy-loaded memory manager reference (set by main.py at startup)
+_memory = None
+
+def set_memory(memory) -> None:
+    """Called at startup so executor can read user preferences like timezone."""
+    global _memory
+    _memory = memory
+
+async def _get_timezone() -> str:
+    if _memory is None:
+        return "America/Mexico_City"
+    return await _memory.get_setting("timezone", "America/Mexico_City")
+
 
 async def execute_tool(tool_name: str, tool_input: dict) -> str:
     """Executes a tool by name and returns a plain-text result."""
@@ -52,12 +65,14 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
         )
 
     if tool_name == "read_whatsapp_chat_history":
+        tz = await _get_timezone()
         return read_whatsapp_chat_history(
             waha_url=config.WAHA_URL,
             phone_or_name=tool_input.get("phone_or_name", ""),
             limit=tool_input.get("limit", 30),
             session=config.WAHA_SESSION,
             api_key=config.WAHA_API_KEY,
+            timezone=tz,
         )
 
     if tool_name == "send_email":
