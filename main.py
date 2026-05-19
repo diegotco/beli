@@ -145,6 +145,7 @@ def main() -> None:
                 owner_chat_id=config.OWNER_TELEGRAM_CHAT_ID,
                 brain=brain,
                 memory=memory,
+                owner_email=config.OWNER_EMAIL,
             )
         _HealthHandler.email_callback = _on_email
         logger.info("Email webhook handler registered.")

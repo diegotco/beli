@@ -17,12 +17,20 @@ logger = logging.getLogger("beli.email.webhook")
 CHANNEL = "telegram"  # share conversation context with the Telegram channel
 
 
+def _extract_address(raw: str) -> str:
+    """Extracts bare email address from 'Name <addr>' or returns raw."""
+    if "<" in raw and ">" in raw:
+        return raw.split("<")[-1].rstrip(">").strip()
+    return raw.strip()
+
+
 def handle_email_webhook(
     payload: dict,
     bot_token: str,
     owner_chat_id: int,
     brain=None,
     memory=None,
+    owner_email: str = "",
 ) -> None:
     """
     Processes an AgentMail webhook payload.
@@ -70,30 +78,47 @@ def handle_email_webhook(
 
         logger.info(f"[Email] Incoming from {sender} | Subject: {subject}")
 
-        # Brief header so the owner knows an email triggered this
-        header = f"Correo de {sender} | Asunto: {subject}"
-        _send_telegram(bot_token, owner_chat_id, header)
+        # Extract the raw email address for comparison
+        sender_email = _extract_address(sender).lower()
+        is_from_owner = bool(owner_email) and (sender_email == owner_email.lower())
 
-        # Route through Beli's brain if available
-        if brain and memory and body:
+        # ── Case 1: email FROM the owner → treat as a command, route through brain ──
+        if is_from_owner and brain and memory and body:
+            logger.info("[Email] From owner — routing through brain.")
+            header = f"Correo tuyo | Asunto: {subject}"
+            _send_telegram(bot_token, owner_chat_id, header)
             asyncio.run(_process_with_brain(
                 brain, memory, owner_chat_id,
                 sender, subject, body, bot_token,
+                ask_reply=False,  # it's the owner's own email — no need to ask
             ))
-        elif body:
-            # Fallback: no brain — show body and suggest reply
+
+        # ── Case 2: email from a third party → notify + ask if owner wants to reply ──
+        else:
+            logger.info(f"[Email] From third party ({sender_email}) — notifying owner.")
             sender_name = sender.split("<")[0].strip().strip('"') or sender
-            preview = body[:500] + ("…" if len(body) > 500 else "")
+            preview = body[:500] + ("…" if len(body) > 500 else "") if body else "(sin cuerpo)"
+            notification = (
+                f"Nuevo correo de {sender}\n"
+                f"Asunto: {subject}\n\n"
+                f"{preview}"
+            )
+            _send_telegram(bot_token, owner_chat_id, notification)
+            # Ask owner if they want to reply
             _send_telegram(
                 bot_token, owner_chat_id,
-                f"{preview}\n\nPara responder: \"responde el correo de {sender_name}: [tu mensaje]\"",
+                f"¿Quieres que le responda algo a {sender_name}?",
             )
 
     except Exception as e:
         logger.exception(f"[Email] Error handling webhook: {e}")
 
 
-async def _process_with_brain(brain, memory, owner_chat_id, sender, subject, body, bot_token):
+async def _process_with_brain(
+    brain, memory, owner_chat_id,
+    sender, subject, body, bot_token,
+    ask_reply: bool = False,
+):
     """Runs Beli's brain on the email body and sends the response to the owner."""
     try:
         from personality import get_system_prompt
@@ -103,9 +128,9 @@ async def _process_with_brain(brain, memory, owner_chat_id, sender, subject, bod
 
         system_prompt = get_system_prompt(extra_context=facts)
 
-        # Present the email as a message from the owner
+        # Present the email as a message from the owner to Beli
         email_message = (
-            f"[Email recibido de {sender} — Asunto: {subject}]\n\n"
+            f"[Email de {sender} — Asunto: {subject}]\n\n"
             f"{body}"
         )
 

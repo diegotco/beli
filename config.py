@@ -78,6 +78,10 @@ class Config:
     # Owner's Telegram chat ID (used for WhatsApp/email webhook notifications)
     OWNER_TELEGRAM_CHAT_ID: int = int(os.getenv("OWNER_TELEGRAM_CHAT_ID", "0"))
 
+    # Owner's personal email address — only emails FROM this address trigger brain processing.
+    # Emails from anyone else are forwarded as notifications and owner is asked to reply.
+    OWNER_EMAIL: str = os.getenv("OWNER_EMAIL", "").lower().strip()
+
     # Public URL of this Beli instance (used to auto-register webhooks)
     # e.g. https://web-production-f3c9e.up.railway.app
     BELI_PUBLIC_URL: str = os.getenv("BELI_PUBLIC_URL", "")
