@@ -212,6 +212,7 @@ class TelegramChannel:
             system_prompt=system,
             history=history,
             new_message=prompt,
+            max_tokens=4096,
         )
 
         await self.memory.save_message(CHANNEL, user_id, "user", "[/digest — resumen de actividad en Telegram]")
