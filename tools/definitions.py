@@ -6,10 +6,10 @@ TOOLS = [
     {
         "name": "find_telegram_contact",
         "description": (
-            "Searches the owner's real Telegram contact list by name and returns who was found. "
-            "Use this FIRST before sending any message to a first-time contact. "
-            "Returns the contact's full name, @username, and ID so the owner can confirm it's the right person. "
-            "If the owner uses a nickname, look up the real name in their profile (owner-profile.md) before calling this tool."
+            "Searches the owner's Telegram contacts AND group chats by name. "
+            "Use this before sending to a first-time contact or group. "
+            "Returns the full name/title, @username, and ID so the owner can confirm it's the right one. "
+            "Works for individual contacts, group chats, and channels."
         ),
         "input_schema": {
             "type": "object",
@@ -66,9 +66,8 @@ TOOLS = [
         "name": "send_as_owner",
         "description": (
             "Sends a Telegram message FROM the owner's personal account (ghost mode). "
-            "The recipient sees the message as if the owner wrote it directly — Beli's account is NOT shown. "
-            "Use this when the owner says 'respóndele', 'dile', 'mándale', 'escríbele' referring to a reply "
-            "they want to send AS THEMSELVES. "
+            "Works for individual contacts AND group chats — the recipient or group sees it as the owner. "
+            "Use this when the owner says 'dile a', 'envía al grupo', 'mándale', 'escríbele', etc. "
             "ALWAYS show a draft first and wait for explicit confirmation before calling this tool. "
             "Never use this tool without the owner's explicit 'sí', 'dale', 'envíalo', or equivalent confirmation."
         ),

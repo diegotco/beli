@@ -2,8 +2,9 @@
 tools/telegram_sender.py - Telegram contact search and message sending via Telethon.
 
 Flow:
-  1. find_telegram_contact() → searches owner's contacts, returns who was found
-  2. send_as_owner()         → sends FROM the owner's personal account (ghost mode)
+  1. find_telegram_contact() → searches owner's contacts AND groups, returns who/what was found
+  2. send_as_owner()         → sends FROM the owner's personal account (ghost mode) — works for
+                               both individual contacts and group chats
   3. read_telegram_chats()   → overview of recent conversations
   4. read_chat_history()     → full history of a specific chat
 """
@@ -84,58 +85,71 @@ async def find_telegram_contact(api_id: int, api_hash: str, name: str) -> str:
                 f"NO pidas confirmación — ya fue confirmado antes."
             )
 
-    # ── Live search via Telegram API (uses owner's session = their contact list) ─
+    # ── Live search via Telegram API — contacts + groups ────────────────────────
     try:
         async with _owner_client(api_id, api_hash) as client:
-            result = await client(GetContactsRequest(hash=0))
-            all_contacts = result.users
             search = name.lower().strip()
-            matches = []
+            matches = []  # list of (label, telegram_id, type, extra)
 
-            for contact in all_contacts:
-                first    = (contact.first_name or "").lower()
-                last     = (contact.last_name  or "").lower()
-                username = (contact.username   or "").lower()
-                phone    = (contact.phone      or "").replace(" ", "").replace("-", "")
+            # 1. Individual contacts
+            result = await client(GetContactsRequest(hash=0))
+            for c in result.users:
+                first    = (c.first_name or "").lower()
+                last     = (c.last_name  or "").lower()
+                uname    = (c.username   or "").lower()
+                phone    = (c.phone      or "").replace(" ", "").replace("-", "")
                 full     = f"{first} {last}".strip()
-
-                if (search in full or search in username or
+                if (search in full or search in uname or
                         first.startswith(search) or last.startswith(search) or
                         search.replace(" ", "").replace("-", "") in phone):
-                    matches.append(contact)
+                    label = f"{c.first_name or ''} {c.last_name or ''}".strip()
+                    if c.username:
+                        label += f" (@{c.username})"
+                    if c.phone:
+                        label += f" | +{c.phone}"
+                    matches.append(("contact", c.id, label))
+
+            # 2. Group chats and channels
+            async for dialog in client.iter_dialogs():
+                entity = dialog.entity
+                if isinstance(entity, User):
+                    continue  # already covered above
+                title = getattr(entity, "title", "") or ""
+                if search in title.lower():
+                    kind  = "channel" if isinstance(entity, Channel) and getattr(entity, "broadcast", False) else "group"
+                    uname = getattr(entity, "username", "") or ""
+                    label = title
+                    if uname:
+                        label += f" (@{uname})"
+                    matches.append((kind, entity.id, label))
 
             if not matches:
                 return (
-                    f"No encontré ningún contacto llamado '{name}' en la lista de Telegram del propietario. "
-                    f"Pide al propietario que te dé el @username o número de teléfono exacto."
+                    f"No encontré ningún contacto ni grupo llamado '{name}' en Telegram. "
+                    f"Intenta con otro nombre o pide al propietario el @username o ID exacto."
                 )
-
-            def _format_contact(c, index=None) -> str:
-                full_name = f"{c.first_name or ''} {c.last_name or ''}".strip()
-                uname = f"@{c.username}" if c.username else "sin @username"
-                phone = f"+{c.phone}" if c.phone else "sin teléfono"
-                prefix = f"  {index}. " if index is not None else "  "
-                return f"{prefix}{full_name} | {uname} | {phone} | ID: {c.id}"
 
             if len(matches) == 1:
-                c = matches[0]
-                phone_val = f"+{c.phone}" if c.phone else ""
+                kind, tid, label = matches[0]
+                kind_es = {"contact": "contacto", "group": "grupo", "channel": "canal"}.get(kind, kind)
                 return (
-                    f"Encontré 1 contacto:\n{_format_contact(c)}\n\n"
-                    f"{'Este contacto solo tiene número de teléfono (' + phone_val + '), sin @username. Puedes enviarle el mensaje usando contact_phone=' + phone_val + '.' if phone_val and not c.username else ''}"
-                    f"Muéstrale estos datos al propietario y confirma que es la persona correcta antes de enviar."
+                    f"Encontré 1 {kind_es}: {label} (telegram_id={tid}).\n\n"
+                    f"Muéstrale esto al propietario y confirma que es correcto antes de enviar. "
+                    f"Luego usa send_as_owner(nickname='...', telegram_id={tid}, message='...')."
                 )
 
-            # Multiple matches
-            lines = "\n".join(_format_contact(c, i+1) for i, c in enumerate(matches))
+            lines = "\n".join(
+                f"  {i+1}. [{{'contact':'contacto','group':'grupo','channel':'canal'}}.get(k, k)}] {lbl} (id={tid})"
+                for i, (k, tid, lbl) in enumerate(matches)
+            )
             return (
-                f"Encontré {len(matches)} contactos que coinciden con '{name}':\n{lines}\n\n"
+                f"Encontré {len(matches)} resultados para '{name}':\n{lines}\n\n"
                 f"Pregúntale al propietario cuál es el correcto."
             )
 
     except Exception as e:
-        logger.exception(f"Error searching contacts: {e}")
-        return f"Error al buscar en los contactos de Telegram: {e}"
+        logger.exception(f"Error searching contacts/groups: {e}")
+        return f"Error al buscar en Telegram: {e}"
 
 
 # ── Tool 2: Send as owner (ghost mode) ───────────────────────────────────────
@@ -188,19 +202,47 @@ async def send_as_owner(
 
     try:
         async with _owner_client(api_id, api_hash) as client:
+            entity = None
+
+            # Try direct resolution first
             try:
                 entity = await client.get_entity(identifier)
-            except Exception as e:
-                return f"No pude encontrar el contacto '{nickname}': {e}"
+            except Exception:
+                pass
+
+            # Fallback: search dialogs by name (catches groups, channels, and contacts
+            # not yet in Telegram's local cache)
+            if entity is None:
+                search = str(identifier).lower()
+                async for dialog in client.iter_dialogs():
+                    e = dialog.entity
+                    title = (
+                        getattr(e, "title", None)
+                        or f"{getattr(e, 'first_name', '') or ''} {getattr(e, 'last_name', '') or ''}".strip()
+                    )
+                    if search in title.lower():
+                        entity = e
+                        logger.info(f"[Ghost] Resolved '{identifier}' via dialog search → {title}")
+                        break
+
+            if entity is None:
+                return (
+                    f"No pude encontrar '{nickname}' en tus chats de Telegram. "
+                    f"Usa find_telegram_contact para buscarlo primero."
+                )
 
             await client.send_message(entity, message)
 
-            full_name = f"{getattr(entity, 'first_name', '') or ''} {getattr(entity, 'last_name', '') or ''}".strip()
-            uname     = getattr(entity, "username", "") or ""
-            logger.info(f"[Ghost] Sent as owner → {full_name}")
+            name_out = (
+                getattr(entity, "title", None)
+                or f"{getattr(entity, 'first_name', '') or ''} {getattr(entity, 'last_name', '') or ''}".strip()
+                or nickname
+            )
+            uname = getattr(entity, "username", "") or ""
+            logger.info(f"[Ghost] Sent as owner → {name_out}")
             return (
-                f"✓ ENVIADO EXITOSAMENTE como tú a {full_name} "
-                f"({'@' + uname if uname else contact_phone or 'sin @username'})."
+                f"✓ ENVIADO EXITOSAMENTE como tú a {name_out}"
+                f"{' (@' + uname + ')' if uname else ''}."
             )
 
     except FloodWaitError as e:
