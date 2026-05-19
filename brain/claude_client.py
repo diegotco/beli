@@ -147,6 +147,13 @@ class BelisBrain:
                 return "Estoy recibiendo demasiadas solicitudes. Espera un par de segundos e intenta de nuevo."
             except anthropic.APIStatusError as e:
                 logger.error(f"Anthropic API error: {e.status_code} - {e.message}")
+                # Surface actionable errors to the owner instead of a generic message
+                body = getattr(e, "body", {}) or {}
+                err_type = body.get("error", {}).get("type", "")
+                if e.status_code == 400 and "credit balance" in str(e.message).lower():
+                    return "⚠️ Sin créditos en Anthropic API. Ve a console.anthropic.com → Plans & Billing para recargar."
+                if e.status_code == 529 or err_type == "overloaded_error":
+                    return "Los servidores de Anthropic están sobrecargados en este momento. Intenta en unos minutos."
                 return "Ocurrió un error inesperado. Por favor intenta de nuevo."
 
             # Log token usage
