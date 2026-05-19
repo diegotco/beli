@@ -14,7 +14,7 @@ import requests
 
 logger = logging.getLogger("beli.email.webhook")
 
-CHANNEL = "telegram"  # share conversation context with the Telegram channel
+CHANNEL = "email"  # separate memory bucket so email history doesn't bleed into Telegram chats
 
 
 def _extract_address(raw: str) -> str:
@@ -109,7 +109,8 @@ def handle_email_webhook(
         # ── Case 1: email FROM the owner → treat as a command, route through brain ──
         if is_from_owner and brain and memory and body:
             logger.info("[Email] From owner — routing through brain.")
-            header = f"Correo tuyo | Asunto: {subject}"
+            preview = body[:600] + ("…" if len(body) > 600 else "")
+            header = f"📧 Correo tuyo | Asunto: {subject}\n\n{preview}"
             _send_telegram(bot_token, owner_chat_id, header)
             _run_brain_async(
                 brain, memory, owner_chat_id,
