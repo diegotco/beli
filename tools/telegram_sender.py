@@ -345,15 +345,35 @@ async def send_as_owner(
 
 async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str:
     """
-    Reads the owner's most recent Telegram conversations.
-    Returns a summary with sender, last message preview, and timestamp.
+    Reads the owner's most recent Telegram conversations, including all folders.
+    Returns a summary with sender, last message preview, unread count, and timestamp.
     """
-    limit = min(max(1, limit), 20)
-    logger.info(f"Reading {limit} most recent chats.")
+    limit = min(max(1, limit), 30)
+    logger.info(f"Reading {limit} most recent chats (all folders).")
 
     try:
         async with _owner_client(api_id, api_hash) as client:
-            dialogs = await client.get_dialogs(limit=limit)
+            # Fetch from all folders to catch archived/muted channels too
+            all_dialogs: list = []
+            seen_ids: set = set()
+            for folder in (0, 1):  # 0 = main, 1 = archived
+                try:
+                    folder_dialogs = await client.get_dialogs(limit=limit, folder=folder)
+                    for d in folder_dialogs:
+                        did = d.id if hasattr(d, "id") else id(d)
+                        if did not in seen_ids:
+                            seen_ids.add(did)
+                            all_dialogs.append(d)
+                except Exception:
+                    pass
+
+            # Sort by last message date descending and cap to limit
+            all_dialogs.sort(
+                key=lambda d: d.message.date if d.message and d.message.date else __import__("datetime").datetime.min.replace(tzinfo=__import__("datetime").timezone.utc),
+                reverse=True,
+            )
+            dialogs = all_dialogs[:limit]
+
             if not dialogs:
                 return "No encontré conversaciones recientes en Telegram."
 
@@ -370,9 +390,9 @@ async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str
                     sender  = "Tú" if msg.out else name.split("(")[0].strip()
                     unread  = f" [{dialog.unread_count} sin leer]" if dialog.unread_count else ""
                     ts      = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
-                    lines.append(f"{i}. **{name}**{unread} — {ts}\n   {sender}: {preview}")
+                    lines.append(f"{i}. {name}{unread} — {ts}\n   {sender}: {preview}")
                 else:
-                    lines.append(f"{i}. **{name}** — (sin mensajes de texto)")
+                    lines.append(f"{i}. {name} — (sin mensajes de texto)")
 
             return "Tus últimas conversaciones en Telegram:\n\n" + "\n\n".join(lines)
 

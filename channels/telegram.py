@@ -218,10 +218,10 @@ class TelegramChannel:
         await self.memory.save_message(CHANNEL, user_id, "assistant", response)
 
         if len(response) <= 4096:
-            await update.message.reply_text(response)
+            await update.message.reply_text(_strip_markdown(response))
         else:
             for chunk in _split_text(response, 4096):
-                await update.message.reply_text(chunk)
+                await update.message.reply_text(_strip_markdown(chunk))
 
     async def _cmd_memory(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Shows the saved facts about the user."""
@@ -276,11 +276,11 @@ class TelegramChannel:
 
         # Send response (Telegram has a 4096-character limit per message)
         if len(response) <= 4096:
-            await update.message.reply_text(response)
+            await update.message.reply_text(_strip_markdown(response))
         else:
             # Split long responses into multiple messages
             for chunk in _split_text(response, 4096):
-                await update.message.reply_text(chunk)
+                await update.message.reply_text(_strip_markdown(chunk))
 
         logger.info(f"Response sent to {user_name}: {response[:80]}{'...' if len(response) > 80 else ''}")
 
@@ -322,10 +322,10 @@ class TelegramChannel:
         await self.memory.save_message(CHANNEL, user_id, "assistant", response)
 
         if len(response) <= 4096:
-            await update.message.reply_text(response)
+            await update.message.reply_text(_strip_markdown(response))
         else:
             for chunk in _split_text(response, 4096):
-                await update.message.reply_text(chunk)
+                await update.message.reply_text(_strip_markdown(chunk))
 
     async def _handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Transcribes a voice note via Groq Whisper, then processes it like a text message."""
@@ -379,10 +379,10 @@ class TelegramChannel:
         await self.memory.save_message(CHANNEL, user_id, "assistant", response)
 
         if len(response) <= 4096:
-            await update.message.reply_text(response)
+            await update.message.reply_text(_strip_markdown(response))
         else:
             for chunk in _split_text(response, 4096):
-                await update.message.reply_text(chunk)
+                await update.message.reply_text(_strip_markdown(chunk))
 
         logger.info(f"Response sent to {user_name} (voice→text): {response[:80]}")
 
@@ -479,6 +479,15 @@ def _load_reminders() -> str:
                 continue
         output.append(line)
     return "\n".join(output).strip()
+
+
+def _strip_markdown(text: str) -> str:
+    """Removes markdown formatting that Beli shouldn't use (bold, headers)."""
+    import re
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)   # **bold** → bold
+    text = re.sub(r'\*(.+?)\*', r'\1', text)         # *italic* → italic
+    text = re.sub(r'#{1,6}\s+', '', text)             # ### Header → Header
+    return text
 
 
 def _split_text(text: str, max_length: int) -> list[str]:
