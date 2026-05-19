@@ -25,8 +25,8 @@ logger = logging.getLogger("beli.telegram.listener")
 # How long to wait before reconnecting after an error
 _RECONNECT_DELAY = 30  # seconds
 
-# Chats to always ignore (e.g. Telegram service notifications)
-_IGNORED_USERNAMES = {"telegram", "telegramchannel", "spambot"}
+# Chats to always ignore (e.g. Telegram service notifications, Beli's own bot)
+_IGNORED_USERNAMES = {"telegram", "telegramchannel", "spambot", "iambelibot"}
 
 
 def _entity_name(entity) -> str:
@@ -74,9 +74,11 @@ async def _build_notification(event, client: TelegramClient, bot_token: str, own
         chat_name   = _entity_name(chat)
         sender_name = _entity_name(sender) if sender else chat_name
 
-        # Skip ignored accounts
+        # Skip ignored accounts and bots (prevents loop with Beli's own bot)
         username = (getattr(sender, "username", "") or "").lower()
         if username in _IGNORED_USERNAMES:
+            return
+        if getattr(sender, "bot", False):
             return
 
         # Determine chat type and mute status
