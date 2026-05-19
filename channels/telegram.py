@@ -164,14 +164,17 @@ class TelegramChannel:
         system  = get_system_prompt(extra)
 
         prompt = (
-            "Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp:\n"
-            "1. Usa read_telegram_chats para ver mis chats de Telegram recientes. "
-            "Para los que tengan mensajes sin leer o necesiten respuesta, usa read_chat_history.\n"
-            "2. Usa read_whatsapp_chats para ver mis chats de WhatsApp recientes. "
-            "Para los que necesiten respuesta, usa read_whatsapp_chat_history.\n"
-            "Luego dame un resumen unificado: qué pasó en cada plataforma, quién escribió, "
-            "qué necesita respuesta urgente, y un borrador de respuesta para cada uno. "
-            "Agrupa por plataforma (Telegram / WhatsApp). Sé conciso y práctico."
+            "Haz un digest completo de mi actividad reciente en Telegram Y WhatsApp.\n\n"
+            "PASO 1 — Telegram: llama read_telegram_chats con limit=20. "
+            "Para TODOS los chats que tengan mensajes sin leer (unread > 0) o actividad reciente de personas (no solo canales), "
+            "llama read_chat_history para ver el contexto. Identifica cuáles necesitan respuesta de mi parte.\n\n"
+            "PASO 2 — WhatsApp: llama read_whatsapp_chats con limit=20. "
+            "Para TODOS los chats con mensajes sin leer o actividad reciente de personas, "
+            "llama read_whatsapp_chat_history para ver el contexto. Identifica cuáles necesitan respuesta.\n\n"
+            "RESULTADO: Dame un resumen agrupado por plataforma (Telegram / WhatsApp). "
+            "Para cada chat que necesita respuesta, incluye: quién escribió, de qué trata, y un borrador concreto de respuesta. "
+            "Para canales informativos (sin conversación), solo un resumen breve de lo más relevante. "
+            "Usa guiones simples para listas, sin asteriscos ni negritas."
         )
 
         response = await self.brain.think(
