@@ -203,33 +203,70 @@ async def send_as_owner(
 
     try:
         async with _owner_client(api_id, api_hash) as client:
-            entity = None
+            entity   = None
+            is_muted = False
 
-            # Try direct resolution first
-            try:
-                entity = await client.get_entity(identifier)
-            except Exception:
-                pass
+            # Always resolve via dialogs — this guarantees the access_hash is present,
+            # which is required for groups and channels (get_entity alone often fails).
+            target_id = int(identifier) if isinstance(identifier, int) else None
+            async for dialog in client.iter_dialogs():
+                e = dialog.entity
+                eid = getattr(e, "id", None)
 
-            # Fallback: search dialogs by name (catches groups, channels, and contacts
-            # not yet in Telegram's local cache)
-            if entity is None:
-                search = str(identifier).lower()
-                async for dialog in client.iter_dialogs():
-                    e = dialog.entity
-                    title = (
-                        getattr(e, "title", None)
-                        or f"{getattr(e, 'first_name', '') or ''} {getattr(e, 'last_name', '') or ''}".strip()
+                # Match by numeric ID
+                id_match = target_id is not None and eid == target_id
+
+                # Match by @username
+                uname_match = (
+                    isinstance(identifier, str)
+                    and not identifier.lstrip("+").isdigit()
+                    and (getattr(e, "username", "") or "").lower() == identifier.lower()
+                )
+
+                # Match by display name (last resort)
+                title = (
+                    getattr(e, "title", None)
+                    or f"{getattr(e, 'first_name', '') or ''} {getattr(e, 'last_name', '') or ''}".strip()
+                )
+                name_match = (
+                    isinstance(identifier, str)
+                    and not identifier.lstrip("+").isdigit()
+                    and str(identifier).lower() in title.lower()
+                )
+
+                if id_match or uname_match or name_match:
+                    entity = e
+                    # Check mute status — mute_until > 0 means notifications are silenced
+                    import time
+                    ns = dialog.dialog.notify_settings
+                    mute_until = getattr(ns, "mute_until", 0) or 0
+                    is_muted = mute_until > int(time.time())
+                    logger.info(
+                        f"[Ghost] Resolved '{identifier}' → {title} "
+                        f"(id={eid}, muted={is_muted})"
                     )
-                    if search in title.lower():
-                        entity = e
-                        logger.info(f"[Ghost] Resolved '{identifier}' via dialog search → {title}")
-                        break
+                    break
+
+            # For individual contacts not found in recent dialogs, fall back to get_entity
+            if entity is None and not isinstance(identifier, int):
+                try:
+                    entity = await client.get_entity(identifier)
+                except Exception:
+                    pass
 
             if entity is None:
                 return (
                     f"No pude encontrar '{nickname}' en tus chats de Telegram. "
                     f"Usa find_telegram_contact para buscarlo primero."
+                )
+
+            # Block sends to muted groups — they're muted for a reason
+            if is_muted and isinstance(entity, (Channel, Chat)):
+                name_out = getattr(entity, "title", nickname)
+                return (
+                    f"El grupo '{name_out}' está silenciado. "
+                    f"No envío mensajes a grupos silenciados para no interrumpir sin querer. "
+                    f"Si quieres enviar de todas formas, desactiva el silencio en Telegram primero."
                 )
 
             await client.send_message(entity, message)
