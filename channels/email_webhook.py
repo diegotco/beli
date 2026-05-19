@@ -2,26 +2,33 @@
 channels/email_webhook.py - Handles incoming emails forwarded by AgentMail.
 
 AgentMail sends a POST to /email/webhook for every message.received event.
-This module parses the payload and notifies the owner via Telegram.
-
-The owner can then reply by telling Beli:
-  "responde el correo de [name] sobre [subject]: [mensaje]"
+This module:
+  1. Parses the payload
+  2. Routes the email body through Beli's brain so she can act on it
+  3. Sends Beli's response (and a brief header) to the owner via Telegram
 """
+import asyncio
 import logging
 
 import requests
 
 logger = logging.getLogger("beli.email.webhook")
 
+CHANNEL = "telegram"  # share conversation context with the Telegram channel
+
 
 def handle_email_webhook(
     payload: dict,
     bot_token: str,
     owner_chat_id: int,
+    brain=None,
+    memory=None,
 ) -> None:
     """
-    Processes an AgentMail webhook payload and notifies the owner via Telegram.
-    Called from the HTTP server thread — must be synchronous.
+    Processes an AgentMail webhook payload.
+    - Sends a brief header notification to the owner.
+    - Routes the email body through Beli's brain so she can act on it.
+    Called from the HTTP server thread — synchronous wrapper around async logic.
     """
     try:
         # Log the full payload for debugging (truncated to 500 chars)
@@ -35,7 +42,7 @@ def handle_email_webhook(
             or ""
         )
 
-        # Only handle incoming messages; accept "message.received" or any non-empty event
+        # Only handle incoming messages
         if event_type and event_type != "message.received":
             logger.info(f"[Email] Ignoring event type: {event_type!r}")
             return
@@ -53,7 +60,6 @@ def handle_email_webhook(
             sender = str(raw_from)
 
         subject = message.get("subject") or "(sin asunto)"
-        # Prefer full text; fall back to preview
         body    = (
             message.get("text")
             or message.get("body")
@@ -62,25 +68,63 @@ def handle_email_webhook(
             or ""
         ).strip()
 
-        # Trim long bodies
-        preview = body[:500] + ("…" if len(body) > 500 else "")
-
-        # Extract display name from "Name <email@...>" format
-        sender_name = sender.split("<")[0].strip().strip('"') or sender
-
         logger.info(f"[Email] Incoming from {sender} | Subject: {subject}")
 
-        notification = (
-            f"Nuevo correo de {sender}\n"
-            f"Asunto: {subject}\n\n"
-            f"{preview}\n\n"
-            f"Para responder: \"responde el correo de {sender_name}: [tu mensaje]\""
-        )
+        # Brief header so the owner knows an email triggered this
+        header = f"Correo de {sender} | Asunto: {subject}"
+        _send_telegram(bot_token, owner_chat_id, header)
 
-        _send_telegram(bot_token, owner_chat_id, notification)
+        # Route through Beli's brain if available
+        if brain and memory and body:
+            asyncio.run(_process_with_brain(
+                brain, memory, owner_chat_id,
+                sender, subject, body, bot_token,
+            ))
+        elif body:
+            # Fallback: no brain — show body and suggest reply
+            sender_name = sender.split("<")[0].strip().strip('"') or sender
+            preview = body[:500] + ("…" if len(body) > 500 else "")
+            _send_telegram(
+                bot_token, owner_chat_id,
+                f"{preview}\n\nPara responder: \"responde el correo de {sender_name}: [tu mensaje]\"",
+            )
 
     except Exception as e:
         logger.exception(f"[Email] Error handling webhook: {e}")
+
+
+async def _process_with_brain(brain, memory, owner_chat_id, sender, subject, body, bot_token):
+    """Runs Beli's brain on the email body and sends the response to the owner."""
+    try:
+        from personality import get_system_prompt
+
+        history = await memory.get_history(CHANNEL, owner_chat_id)
+        facts   = await memory.get_facts(CHANNEL, owner_chat_id)
+
+        system_prompt = get_system_prompt(extra_context=facts)
+
+        # Present the email as a message from the owner
+        email_message = (
+            f"[Email recibido de {sender} — Asunto: {subject}]\n\n"
+            f"{body}"
+        )
+
+        response = await brain.think(
+            system_prompt=system_prompt,
+            history=history,
+            new_message=email_message,
+            max_tokens=1024,
+        )
+
+        # Persist in conversation memory so context carries forward
+        await memory.save_message(CHANNEL, owner_chat_id, "user",      email_message)
+        await memory.save_message(CHANNEL, owner_chat_id, "assistant", response)
+
+        _send_telegram(bot_token, owner_chat_id, response)
+        logger.info("[Email] Brain response sent to owner.")
+
+    except Exception as e:
+        logger.exception(f"[Email] Brain processing failed: {e}")
 
 
 def _send_telegram(token: str, chat_id: int, text: str) -> None:

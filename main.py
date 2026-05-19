@@ -143,6 +143,8 @@ def main() -> None:
                 payload=payload,
                 bot_token=config.TELEGRAM_BOT_TOKEN,
                 owner_chat_id=config.OWNER_TELEGRAM_CHAT_ID,
+                brain=brain,
+                memory=memory,
             )
         _HealthHandler.email_callback = _on_email
         logger.info("Email webhook handler registered.")
