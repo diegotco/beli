@@ -11,9 +11,10 @@ jobs:
     steps:
       - name: Check /health endpoint
         id: check
+        continue-on-error: true
         run: |
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            https://web-production-f3c9e.up.railway.app/health)
+            https://web-production-f3c9e.up.railway.app/health || echo "000")
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "HTTP status: $STATUS"
           if [ "$STATUS" != "200" ]; then
