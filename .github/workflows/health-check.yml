@@ -16,13 +16,14 @@ jobs:
             https://web-production-f3c9e.up.railway.app/health)
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
           echo "HTTP status: $STATUS"
-          # SIMULACIÓN DE CRASH — forzar fallo para probar la alerta
-          echo "failed=true" >> "$GITHUB_OUTPUT"
+          if [ "$STATUS" != "200" ]; then
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Alert via Telegram if down
         if: steps.check.outputs.failed == 'true'
         run: |
-          MSG="🚨 *Beli está caída* 🚨%0A%0AEl endpoint de salud devolvió HTTP ${{ steps.check.outputs.status }} en lugar de 200.%0A%0ARailway debería reiniciarla automáticamente — te avisaré cuando vuelva a estar en línea."
+          MSG="🚨 *Beli está caído* 🚨%0A%0AEl endpoint de salud devolvió HTTP ${{ steps.check.outputs.status }} en lugar de 200.%0A%0ARailway debería reiniciarlo automáticamente — te avisaré cuando vuelva a estar en línea."
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=${MSG}&parse_mode=Markdown"
