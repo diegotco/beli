@@ -133,6 +133,11 @@ def main() -> None:
         waha_api_key=config.WAHA_API_KEY,
         birthday_contacts_json=config.BIRTHDAY_CONTACTS,
         birthday_hour=config.BIRTHDAY_HOUR,
+        x_api_key=config.X_API_KEY,
+        x_api_secret=config.X_API_SECRET,
+        x_bearer_token=config.X_BEARER_TOKEN,
+        x_access_token=config.X_ACCESS_TOKEN,
+        x_access_token_secret=config.X_ACCESS_TOKEN_SECRET,
     )
 
     # ── WhatsApp webhook ──────────────────────────────────────────────────────

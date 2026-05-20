@@ -58,6 +58,12 @@ class TelegramChannel:
         waha_api_key: str = "",
         birthday_contacts_json: str = "",
         birthday_hour: int = 6,
+        # X / Twitter monitoring
+        x_api_key: str = "",
+        x_api_secret: str = "",
+        x_bearer_token: str = "",
+        x_access_token: str = "",
+        x_access_token_secret: str = "",
     ):
         self.token = token
         self.brain = brain
@@ -80,6 +86,13 @@ class TelegramChannel:
         self._waha_api_key          = waha_api_key
         self._birthday_contacts_json = birthday_contacts_json
         self._birthday_hour         = birthday_hour
+
+        # X monitoring config
+        self._x_api_key             = x_api_key
+        self._x_api_secret          = x_api_secret
+        self._x_bearer_token        = x_bearer_token
+        self._x_access_token        = x_access_token
+        self._x_access_token_secret = x_access_token_secret
 
         self.app = Application.builder().token(token).post_init(self._post_init).build()
         self._register_handlers()
@@ -106,6 +119,15 @@ class TelegramChannel:
             self._job_monthly_reminder,
             time=datetime.time(hour=self.reminder_hour, minute=self.reminder_minute),
         )
+        # X activity monitor — every 15 minutes
+        if self._x_bearer_token:
+            self.app.job_queue.run_repeating(
+                self._job_x_monitor,
+                interval=900,
+                first=120,
+            )
+            logger.info("X monitor active — polling every 15 minutes.")
+
         # Daily birthday check — 6 AM CDMX
         if self._birthday_contacts_json and self._waha_url:
             self.app.job_queue.run_daily(
@@ -525,6 +547,63 @@ class TelegramChannel:
                 logger.info(f"Reminder sent to chat_id={chat_id}")
             except Exception as e:
                 logger.error(f"Failed to send reminder to chat_id={chat_id}: {e}")
+
+    async def _job_x_monitor(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Every 15 min: checks X for new mentions, likes, and DMs."""
+        from tools.x_monitor import (
+            build_client, get_user_id, check_new_mentions,
+            check_like_changes, check_new_dms, format_notifications,
+        )
+        try:
+            client = build_client(
+                self._x_api_key, self._x_api_secret, self._x_bearer_token,
+                self._x_access_token, self._x_access_token_secret,
+            )
+
+            # Resolve user ID (cached in DB after first run)
+            user_id = await self.memory.get_setting("x_user_id")
+            if not user_id:
+                user_id = get_user_id(client)
+                if user_id:
+                    await self.memory.save_setting("x_user_id", user_id)
+                else:
+                    logger.warning("[X] Could not resolve user ID — skipping.")
+                    return
+
+            # Load persisted state
+            last_mention_id = await self.memory.get_setting("x_last_mention_id")
+            last_dm_id      = await self.memory.get_setting("x_last_dm_id")
+            like_counts_raw = await self.memory.get_setting("x_like_counts")
+            like_counts     = json.loads(like_counts_raw) if like_counts_raw else {}
+
+            # Check activity
+            mentions,     new_mention_id = check_new_mentions(client, user_id, last_mention_id)
+            like_changes, new_like_counts = check_like_changes(client, user_id, like_counts)
+            dms,          new_dm_id      = check_new_dms(client, last_dm_id)
+
+            # Persist updated state
+            if new_mention_id and new_mention_id != last_mention_id:
+                await self.memory.save_setting("x_last_mention_id", new_mention_id)
+            if new_dm_id and new_dm_id != last_dm_id:
+                await self.memory.save_setting("x_last_dm_id", new_dm_id)
+            if new_like_counts != like_counts:
+                await self.memory.save_setting("x_like_counts", json.dumps(new_like_counts))
+
+            # Send Telegram notifications
+            notifications = format_notifications(mentions, like_changes, dms)
+            if not notifications:
+                return
+
+            chat_ids = await self.memory.get_telegram_chat_ids()
+            for chat_id in chat_ids:
+                for msg in notifications:
+                    try:
+                        await context.bot.send_message(chat_id=chat_id, text=msg)
+                    except Exception as e:
+                        logger.error(f"[X] Failed to send notification to {chat_id}: {e}")
+
+        except Exception as e:
+            logger.exception(f"[X] Error in X monitor job: {e}")
 
     async def _job_birthday_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Daily job at 6 AM CDMX: sends birthday WhatsApp messages."""

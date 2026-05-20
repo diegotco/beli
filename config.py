@@ -108,6 +108,13 @@ class Config:
     BIRTHDAY_CONTACTS: str = os.getenv("BIRTHDAY_CONTACTS", "")
     BIRTHDAY_HOUR: int = int(os.getenv("BIRTHDAY_HOUR", "6"))    # 6 AM CDMX
 
+    # X / Twitter monitoring
+    X_API_KEY: str = os.getenv("X_API_KEY", "")
+    X_API_SECRET: str = os.getenv("X_API_SECRET", "")
+    X_BEARER_TOKEN: str = os.getenv("X_BEARER_TOKEN", "")
+    X_ACCESS_TOKEN: str = os.getenv("X_ACCESS_TOKEN", "")
+    X_ACCESS_TOKEN_SECRET: str = os.getenv("X_ACCESS_TOKEN_SECRET", "")
+
     @classmethod
     def validate(cls) -> None:
         """Checks that all critical variables are configured."""

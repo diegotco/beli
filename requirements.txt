@@ -32,3 +32,6 @@ google-auth-oauthlib>=1.2.0
 
 # OpenAI (GPT-4o for general conversation without tools)
 openai>=1.30.0
+
+# X / Twitter API v2
+tweepy>=4.14.0
