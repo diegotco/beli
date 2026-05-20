@@ -273,7 +273,22 @@ def read_whatsapp_chat_history(
             msg_type = msg.get("type", "")
             has_media = msg.get("hasMedia", False)
             from_me   = msg.get("fromMe", False)
-            sender    = "Tú" if from_me else phone_or_name.split()[0]
+            if from_me:
+                sender = "Tú"
+            else:
+                # For group messages, 'author' or 'participant' holds the individual sender's JID
+                author_jid = msg.get("author") or msg.get("participant") or ""
+                notify_name = (
+                    msg.get("_data", {}).get("notifyName")
+                    or msg.get("notifyName")
+                    or ""
+                )
+                if notify_name:
+                    sender = notify_name
+                elif author_jid:
+                    sender = author_jid.replace("@c.us", "").replace("@s.whatsapp.net", "")
+                else:
+                    sender = phone_or_name.split()[0]
 
             ts = msg.get("timestamp", "")
             if ts:
