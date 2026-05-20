@@ -311,20 +311,58 @@ class TelegramChannel:
     # NOTIFICATION SETTINGS
     # ------------------------------------------------------------------
 
-    def _notifications_keyboard(self) -> InlineKeyboardMarkup:
-        """Builds an inline keyboard showing the current notification toggle state."""
+    # ── Notification menu helpers ─────────────────────────────────────────────
+
+    @staticmethod
+    def _notif_toggle_label(key: str, text: str) -> InlineKeyboardButton:
+        from settings.notifications import get_settings
+        icon = "🟢" if get_settings().is_enabled(key) else "🔴"
+        return InlineKeyboardButton(f"{icon} {text}", callback_data=f"notif:toggle:{key}")
+
+    @staticmethod
+    def _notif_category_label(page: str, text: str) -> InlineKeyboardButton:
+        """Returns True (any sub-key enabled) indicator for a category button."""
         from settings.notifications import get_settings
         s = get_settings()
+        category_keys = {
+            "messaging": ["whatsapp_direct", "whatsapp_groups", "telegram_direct", "telegram_groups"],
+            "x":         ["x_mentions", "x_likes", "x_dms"],
+        }
+        keys = category_keys.get(page, [])
+        any_on = any(s.is_enabled(k) for k in keys)
+        icon = "🟢" if any_on else "⚪"
+        return InlineKeyboardButton(f"{icon} {text} ›", callback_data=f"notif:page:{page}")
 
-        def label(key: str, text: str) -> InlineKeyboardButton:
-            icon = "🟢" if s.is_enabled(key) else "🔴"
-            return InlineKeyboardButton(f"{icon} {text}", callback_data=f"notif:{key}")
+    def _notifications_keyboard(self, page: str = "main") -> InlineKeyboardMarkup:
+        """Builds the notification menu for the given page."""
+        t = self._notif_toggle_label
 
+        if page == "messaging":
+            return InlineKeyboardMarkup([
+                [InlineKeyboardButton("── WhatsApp ──", callback_data="notif:noop")],
+                [t("whatsapp_direct", "Directos"), t("whatsapp_groups", "Grupos")],
+                [InlineKeyboardButton("── Telegram ──", callback_data="notif:noop")],
+                [t("telegram_direct", "Directos"), t("telegram_groups", "Grupos")],
+                [InlineKeyboardButton("← Volver", callback_data="notif:page:main")],
+            ])
+
+        if page == "x":
+            return InlineKeyboardMarkup([
+                [t("x_mentions", "Menciones"), t("x_likes", "Likes")],
+                [t("x_dms", "DMs")],
+                [InlineKeyboardButton("← Volver", callback_data="notif:page:main")],
+            ])
+
+        # Main menu
+        c = self._notif_category_label
+        from settings.notifications import get_settings
+        cal_icon = "🟢" if get_settings().is_enabled("calendar_reminders") else "⚪"
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("── WhatsApp ──", callback_data="notif:noop")],
-            [label("whatsapp_direct", "Directos"), label("whatsapp_groups", "Grupos")],
-            [InlineKeyboardButton("── Telegram ──", callback_data="notif:noop")],
-            [label("telegram_direct", "Directos"), label("telegram_groups", "Grupos")],
+            [c("messaging", "💬 Mensajería"), c("x", "𝕏 X")],
+            [InlineKeyboardButton(
+                f"{cal_icon} 📅 Calendario",
+                callback_data="notif:toggle:calendar_reminders"
+            )],
             [InlineKeyboardButton("✖ Cerrar", callback_data="notif:close")],
         ])
 
@@ -340,22 +378,40 @@ class TelegramChannel:
     async def _cb_notifications(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handles inline button presses for the notification settings menu."""
         query = update.callback_query
+        action = query.data[len("notif:"):]  # e.g. "noop", "close", "page:main", "toggle:x_likes"
 
-        key = query.data[len("notif:"):]  # strip "notif:" prefix
-        if key == "noop":
+        if action == "noop":
             await query.answer()
             return
-        if key == "close":
+
+        if action == "close":
             await query.message.delete()
             await query.answer()
             return
 
-        from settings.notifications import get_settings
-        new_value = get_settings().toggle(key)
-        status_text = "✅ Activado" if new_value else "🔕 Desactivado"
+        if action.startswith("page:"):
+            page = action[len("page:"):]
+            await query.edit_message_reply_markup(reply_markup=self._notifications_keyboard(page))
+            await query.answer()
+            return
 
-        await query.edit_message_reply_markup(reply_markup=self._notifications_keyboard())
-        await query.answer(status_text, show_alert=False)
+        if action.startswith("toggle:"):
+            setting_key = action[len("toggle:"):]
+            from settings.notifications import get_settings
+            new_value = get_settings().toggle(setting_key)
+            # Stay on the sub-page that contains this toggle
+            if setting_key in ("whatsapp_direct", "whatsapp_groups", "telegram_direct", "telegram_groups"):
+                page = "messaging"
+            elif setting_key in ("x_mentions", "x_likes", "x_dms"):
+                page = "x"
+            else:
+                page = "main"
+            status_text = "✅ Activado" if new_value else "🔕 Desactivado"
+            await query.edit_message_reply_markup(reply_markup=self._notifications_keyboard(page))
+            await query.answer(status_text, show_alert=False)
+            return
+
+        await query.answer()
 
     # ------------------------------------------------------------------
     # MESSAGES
@@ -629,7 +685,16 @@ class TelegramChannel:
             if new_like_counts != like_counts:
                 await self.memory.save_setting("x_like_counts", json.dumps(new_like_counts))
 
-            # Send Telegram notifications
+            # Filter by notification toggles
+            from settings.notifications import get_settings
+            ns = get_settings()
+            if not ns.is_enabled("x_mentions"):
+                mentions = []
+            if not ns.is_enabled("x_likes"):
+                like_changes = []
+            if not ns.is_enabled("x_dms"):
+                dms = []
+
             notifications = format_notifications(mentions, like_changes, dms)
             if not notifications:
                 return

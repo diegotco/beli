@@ -5,10 +5,14 @@ Stores a JSON file at data/notification_settings.json.
 All keys default to False (notifications off by default).
 
 Keys:
-  whatsapp_direct  — direct WhatsApp messages
-  whatsapp_groups  — WhatsApp group messages
-  telegram_direct  — direct Telegram messages
-  telegram_groups  — Telegram group/channel messages
+  whatsapp_direct     — direct WhatsApp messages
+  whatsapp_groups     — WhatsApp group messages
+  telegram_direct     — direct Telegram messages
+  telegram_groups     — Telegram group/channel messages
+  x_mentions          — X mentions and replies
+  x_likes             — X like count changes
+  x_dms               — X direct messages
+  calendar_reminders  — daily morning agenda summary
 """
 import json
 import logging
@@ -19,10 +23,17 @@ logger = logging.getLogger("beli.settings.notifications")
 _SETTINGS_FILENAME = "notification_settings.json"
 
 _DEFAULTS: dict[str, bool] = {
+    # Messaging
     "whatsapp_direct": False,
     "whatsapp_groups": False,
     "telegram_direct": False,
     "telegram_groups": False,
+    # X / Twitter
+    "x_mentions": False,
+    "x_likes":    False,
+    "x_dms":      False,
+    # Google Calendar
+    "calendar_reminders": False,
 }
 
 
