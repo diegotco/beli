@@ -325,6 +325,7 @@ class TelegramChannel:
             [label("whatsapp_direct", "Directos"), label("whatsapp_groups", "Grupos")],
             [InlineKeyboardButton("── Telegram ──", callback_data="notif:noop")],
             [label("telegram_direct", "Directos"), label("telegram_groups", "Grupos")],
+            [InlineKeyboardButton("✖ Cerrar", callback_data="notif:close")],
         ])
 
     async def _cmd_notifications(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -342,6 +343,10 @@ class TelegramChannel:
 
         key = query.data[len("notif:"):]  # strip "notif:" prefix
         if key == "noop":
+            await query.answer()
+            return
+        if key == "close":
+            await query.message.delete()
             await query.answer()
             return
 
