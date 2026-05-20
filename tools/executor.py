@@ -9,6 +9,7 @@ from tools.telegram_sender import find_telegram_contact, send_as_owner, read_tel
 from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history
 from tools.email_sender import send_email
 from tools.calendar_tool import read_calendar_events, create_calendar_event
+from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
 from tools.tasks_tool import (
     list_task_lists,
     list_tasks,
@@ -234,6 +235,45 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
             task_title_or_id=tool_input.get("task_title_or_id", ""),
             list_id=list_id,
+        )
+
+    # ── Gmail ─────────────────────────────────────────────────────────────────
+
+    if tool_name == "read_gmail_inbox":
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                read_gmail_inbox,
+                credentials_json=config.GMAIL_CREDENTIALS,
+                max_results=tool_input.get("max_results", 10),
+                unread_only=tool_input.get("unread_only", False),
+            ),
+        )
+
+    if tool_name == "read_gmail_message":
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                read_gmail_message,
+                credentials_json=config.GMAIL_CREDENTIALS,
+                message_id_or_subject=tool_input.get("message_id_or_subject", ""),
+            ),
+        )
+
+    if tool_name == "send_gmail_message":
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                send_gmail_message,
+                credentials_json=config.GMAIL_CREDENTIALS,
+                to=tool_input.get("to", ""),
+                subject=tool_input.get("subject", ""),
+                body=tool_input.get("body", ""),
+                thread_id=tool_input.get("thread_id"),
+            ),
         )
 
     if tool_name == "post_tweet":

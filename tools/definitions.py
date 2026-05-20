@@ -390,6 +390,82 @@ TOOLS = [
         },
     },
     {
+        "name": "read_gmail_inbox",
+        "description": (
+            "Reads the owner's Gmail inbox and returns a summary of recent emails. "
+            "Use when the owner asks to check, review, or summarize their email, inbox, or correos. "
+            "Set unread_only=true when they ask specifically for unread or new emails. "
+            "Returns sender, subject, snippet, and message ID for each email."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "max_results": {
+                    "type": "integer",
+                    "description": "Number of emails to return (default 10, max 20).",
+                },
+                "unread_only": {
+                    "type": "boolean",
+                    "description": "If true, only return unread emails. Default false.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "read_gmail_message",
+        "description": (
+            "Reads the full content of a specific Gmail email. "
+            "Use when the owner wants to read, open, or see the details of a particular email. "
+            "Pass the message ID from read_gmail_inbox, or a subject keyword to search for."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message_id_or_subject": {
+                    "type": "string",
+                    "description": (
+                        "Gmail message ID (from read_gmail_inbox, e.g. '18f3a2b4c5d6e7f8') "
+                        "or subject text to search for (e.g. 'Propuesta de colaboración')."
+                    ),
+                },
+            },
+            "required": ["message_id_or_subject"],
+        },
+    },
+    {
+        "name": "send_gmail_message",
+        "description": (
+            "Sends an email FROM the owner's personal Gmail account. "
+            "Use when the owner asks to reply or send an email from their personal address (not beli@agentmail.to). "
+            "Use send_email (AgentMail) only if the owner explicitly wants it from Beli's address. "
+            "ALWAYS show a full draft (To, Subject, body) and wait for explicit confirmation before sending. "
+            "To reply to an existing email, pass the thread_id from read_gmail_message."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string",
+                    "description": "Recipient email address.",
+                },
+                "subject": {
+                    "type": "string",
+                    "description": "Email subject.",
+                },
+                "body": {
+                    "type": "string",
+                    "description": "Plain-text email body.",
+                },
+                "thread_id": {
+                    "type": "string",
+                    "description": "Optional. Gmail thread ID to send as a reply in the same thread.",
+                },
+            },
+            "required": ["to", "subject", "body"],
+        },
+    },
+    {
         "name": "post_tweet",
         "description": (
             "Posts a tweet on @DiegoCapital_99 on X (Twitter). "
