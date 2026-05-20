@@ -15,6 +15,7 @@ from tools.tasks_tool import (
     create_task,
     complete_task,
     delete_task,
+    find_list_id_by_name,
 )
 
 logger = logging.getLogger("beli.tools.executor")
@@ -157,21 +158,31 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
 
     def _safe_list_id(requested: str) -> str | None:
         """Returns the allowed list ID, or None if the request targets a blocked list."""
-        # If no list specified, default to the shopping list
-        if not requested or requested == "@default":
-            return config.TASKS_SHOPPING_LIST_ID
-        # Block protected lists
+        # Block protected lists immediately
         if requested in config.TASKS_BLOCKED_LIST_IDS:
             return None
-        # Allow the shopping list (by ID or by name)
-        if requested == config.TASKS_SHOPPING_LIST_ID or "compras" in requested.lower():
+        # If no list specified or shopping list requested by name → dynamic lookup
+        if not requested or requested == "@default" or "compras" in requested.lower():
+            live_id = find_list_id_by_name(
+                config.GOOGLE_CALENDAR_CREDENTIALS, "compras"
+            )
+            if live_id:
+                return live_id
+            # Fall back to hardcoded ID if lookup fails
             return config.TASKS_SHOPPING_LIST_ID
-        # Any other list: block as well (allowlist approach)
+        # Allow shopping list by its hardcoded ID
+        if requested == config.TASKS_SHOPPING_LIST_ID:
+            return config.TASKS_SHOPPING_LIST_ID
+        # Any other list: block (allowlist approach)
         return None
 
     if tool_name == "list_task_lists":
-        # Always show only the shopping list — never expose protected lists
-        return f"Lista de tareas disponible:\n• Lista de compras (id: {config.TASKS_SHOPPING_LIST_ID})"
+        # Show the real shopping list ID so Beli always uses the correct one
+        live_id = find_list_id_by_name(
+            config.GOOGLE_CALENDAR_CREDENTIALS, "compras"
+        )
+        list_id = live_id or config.TASKS_SHOPPING_LIST_ID
+        return f"Lista de tareas disponible:\n• Lista de compras (id: {list_id})"
 
     if tool_name == "list_tasks":
         list_id = _safe_list_id(tool_input.get("list_id", ""))

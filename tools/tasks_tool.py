@@ -69,6 +69,27 @@ def list_task_lists(credentials_json: str) -> str:
         return f"Error al obtener las listas de tareas: {e}"
 
 
+def find_list_id_by_name(credentials_json: str, name_keyword: str) -> str | None:
+    """
+    Finds a task list ID by searching for a keyword in the list title.
+    Returns the list ID or None if not found.
+    """
+    if not credentials_json:
+        return None
+    try:
+        service = _get_service(credentials_json)
+        result = service.tasklists().list().execute()
+        items = result.get("items", [])
+        keyword = name_keyword.lower()
+        for item in items:
+            if keyword in item.get("title", "").lower():
+                return item.get("id")
+        return None
+    except Exception as e:
+        logger.warning(f"[Tasks] Could not find list by name '{name_keyword}': {e}")
+        return None
+
+
 def list_tasks(
     credentials_json: str,
     list_id: str = "@default",
