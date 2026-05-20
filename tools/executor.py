@@ -150,39 +150,68 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             timezone=tz,
         )
 
+    # ── Google Tasks ──────────────────────────────────────────────────────────
+    # Beli may only read/write "Lista de compras".
+    # "Mis no negociables" and any other list are permanently blocked.
+
+    def _safe_list_id(requested: str) -> str | None:
+        """Returns the allowed list ID, or None if the request targets a blocked list."""
+        # If no list specified, default to the shopping list
+        if not requested or requested == "@default":
+            return config.TASKS_SHOPPING_LIST_ID
+        # Block protected lists
+        if requested in config.TASKS_BLOCKED_LIST_IDS:
+            return None
+        # Allow the shopping list (by ID or by name)
+        if requested == config.TASKS_SHOPPING_LIST_ID or "compras" in requested.lower():
+            return config.TASKS_SHOPPING_LIST_ID
+        # Any other list: block as well (allowlist approach)
+        return None
+
     if tool_name == "list_task_lists":
-        return list_task_lists(
-            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
-        )
+        # Always show only the shopping list — never expose protected lists
+        return f"Lista de tareas disponible:\n• Lista de compras (id: {config.TASKS_SHOPPING_LIST_ID})"
 
     if tool_name == "list_tasks":
+        list_id = _safe_list_id(tool_input.get("list_id", ""))
+        if list_id is None:
+            return "No tengo acceso a esa lista."
         return list_tasks(
             credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
-            list_id=tool_input.get("list_id", "@default"),
+            list_id=list_id,
             show_completed=tool_input.get("show_completed", False),
         )
 
     if tool_name == "create_task":
+        list_id = _safe_list_id(tool_input.get("list_id", ""))
+        if list_id is None:
+            return "No tengo permiso para modificar esa lista."
         return create_task(
             credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
             title=tool_input.get("title", ""),
-            list_id=tool_input.get("list_id", "@default"),
+            list_id=list_id,
             notes=tool_input.get("notes", ""),
             due_date=tool_input.get("due_date", ""),
         )
 
     if tool_name == "complete_task":
+        list_id = _safe_list_id(tool_input.get("list_id", ""))
+        if list_id is None:
+            return "No tengo permiso para modificar esa lista."
         return complete_task(
             credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
             task_title_or_id=tool_input.get("task_title_or_id", ""),
-            list_id=tool_input.get("list_id", "@default"),
+            list_id=list_id,
         )
 
     if tool_name == "delete_task":
+        list_id = _safe_list_id(tool_input.get("list_id", ""))
+        if list_id is None:
+            return "No tengo permiso para modificar esa lista."
         return delete_task(
             credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
             task_title_or_id=tool_input.get("task_title_or_id", ""),
-            list_id=tool_input.get("list_id", "@default"),
+            list_id=list_id,
         )
 
     logger.warning(f"Unknown tool called: {tool_name}")

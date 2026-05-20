@@ -89,6 +89,10 @@ class Config:
     # Google Calendar (OAuth credentials JSON, obtained via setup_google_calendar.py)
     GOOGLE_CALENDAR_CREDENTIALS: str = os.getenv("GOOGLE_CALENDAR_CREDENTIALS", "")
 
+    # Google Tasks — IDs are fixed so Beli can never touch protected lists
+    TASKS_SHOPPING_LIST_ID: str = "M29PbUpETmk5ejNMUTM0bw"       # "Lista de compras" — editable
+    TASKS_BLOCKED_LIST_IDS: list = ["MDcyMDQ2NTgxNjY5ODk2NDYzMjc6MDow"]  # "Mis no negociables" — read-only
+
     # Memory
     MEMORY_WINDOW: int = int(os.getenv("MEMORY_WINDOW", "20"))
 
