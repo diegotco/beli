@@ -204,7 +204,13 @@ class BelisBrain:
             # Verify that success claims are backed by an actual tool result.
             tool_confirmed_success = any(SUCCESS_SIGNAL in r for r in action_tool_results)
 
-            if _claims_success(final_text) and not tool_confirmed_success:
+            # If Claude is asking for confirmation it hasn't acted yet — never block these.
+            is_asking_confirmation = any(
+                p in final_text.lower()
+                for p in ["¿confirmas?", "¿confirmas", "¿envío", "¿lo envío", "¿procedo", "¿lo hago"]
+            )
+
+            if _claims_success(final_text) and not tool_confirmed_success and not is_asking_confirmation:
                 if action_tool_results:
                     # Tools ran but returned an error — Claude is hiding the failure.
                     logger.error(
