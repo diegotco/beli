@@ -1,5 +1,5 @@
 """
-setup_google_calendar.py - One-time OAuth flow to get Google Calendar credentials.
+setup_google_calendar.py - One-time OAuth flow to get Google Calendar and Tasks credentials.
 
 Run this ONCE locally:
   python setup_google_calendar.py
@@ -7,6 +7,8 @@ Run this ONCE locally:
 It will open a browser, ask you to log in with your Google account,
 and then print a JSON string. Copy that string into the Railway env var:
   GOOGLE_CALENDAR_CREDENTIALS=<paste here>
+
+This script authorizes both Google Calendar and Google Tasks with a single token.
 
 Requirements:
   pip install google-auth-oauthlib google-auth-httplib2 google-api-python-client
@@ -23,7 +25,10 @@ def main():
     from google_auth_oauthlib.flow import InstalledAppFlow
     from googleapiclient.discovery import build
 
-    scopes = ["https://www.googleapis.com/auth/calendar"]
+    scopes = [
+        "https://www.googleapis.com/auth/calendar",
+        "https://www.googleapis.com/auth/tasks",
+    ]
 
     if not Path(CLIENT_SECRETS_FILE).exists():
         print(f"""
@@ -53,11 +58,12 @@ Pasos para obtenerlo:
     creds_json = json.dumps(creds_data)
 
     print("\n" + "=" * 60)
-    print("✅ Autenticación exitosa.")
+    print("✅ Autenticación exitosa (Calendar + Tasks).")
     print("=" * 60)
     print("\nCopia el siguiente valor en Railway como variable de entorno:")
     print("  Nombre:  GOOGLE_CALENDAR_CREDENTIALS")
     print("  Valor:   (ver abajo)")
+    print("\nEste token autoriza tanto Google Calendar como Google Tasks.")
     print("\n" + creds_json)
     print("\n" + "=" * 60)
 

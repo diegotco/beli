@@ -9,6 +9,13 @@ from tools.telegram_sender import find_telegram_contact, send_as_owner, read_tel
 from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history
 from tools.email_sender import send_email
 from tools.calendar_tool import read_calendar_events, create_calendar_event
+from tools.tasks_tool import (
+    list_task_lists,
+    list_tasks,
+    create_task,
+    complete_task,
+    delete_task,
+)
 
 logger = logging.getLogger("beli.tools.executor")
 
@@ -141,6 +148,41 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             description=tool_input.get("description", ""),
             location=tool_input.get("location", ""),
             timezone=tz,
+        )
+
+    if tool_name == "list_task_lists":
+        return list_task_lists(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+        )
+
+    if tool_name == "list_tasks":
+        return list_tasks(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            list_id=tool_input.get("list_id", "@default"),
+            show_completed=tool_input.get("show_completed", False),
+        )
+
+    if tool_name == "create_task":
+        return create_task(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            title=tool_input.get("title", ""),
+            list_id=tool_input.get("list_id", "@default"),
+            notes=tool_input.get("notes", ""),
+            due_date=tool_input.get("due_date", ""),
+        )
+
+    if tool_name == "complete_task":
+        return complete_task(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            task_title_or_id=tool_input.get("task_title_or_id", ""),
+            list_id=tool_input.get("list_id", "@default"),
+        )
+
+    if tool_name == "delete_task":
+        return delete_task(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            task_title_or_id=tool_input.get("task_title_or_id", ""),
+            list_id=tool_input.get("list_id", "@default"),
         )
 
     logger.warning(f"Unknown tool called: {tool_name}")

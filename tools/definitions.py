@@ -274,4 +274,111 @@ TOOLS = [
             "required": ["title", "start_datetime", "end_datetime"],
         },
     },
+    {
+        "name": "list_task_lists",
+        "description": (
+            "Returns all of the owner's Google Tasks lists with their IDs. "
+            "Use this when the owner asks to see their task lists or before operating on a specific list by name."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "list_tasks",
+        "description": (
+            "Returns the tasks in a Google Tasks list. "
+            "Use this when the owner asks to see, check, or review their tasks or to-do list. "
+            "Defaults to the primary list. Pass show_completed=true to also show done tasks."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "list_id": {
+                    "type": "string",
+                    "description": "Task list ID or '@default' for the primary list (default: '@default').",
+                },
+                "show_completed": {
+                    "type": "boolean",
+                    "description": "If true, also return completed tasks. Default false.",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "create_task",
+        "description": (
+            "Creates a new task in a Google Tasks list. "
+            "Use this when the owner asks to add, create, or save a task or to-do item."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {
+                    "type": "string",
+                    "description": "Task title.",
+                },
+                "list_id": {
+                    "type": "string",
+                    "description": "Task list ID or '@default' for the primary list (default: '@default').",
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional task notes or description.",
+                },
+                "due_date": {
+                    "type": "string",
+                    "description": "Optional due date in YYYY-MM-DD format, e.g. '2026-05-25'.",
+                },
+            },
+            "required": ["title"],
+        },
+    },
+    {
+        "name": "complete_task",
+        "description": (
+            "Marks a task as completed in a Google Tasks list. "
+            "Use this when the owner says they finished, completed, or did a task. "
+            "Finds the task by title (partial match) or by its ID."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_title_or_id": {
+                    "type": "string",
+                    "description": "Task title (or substring) to search for, or the exact task ID.",
+                },
+                "list_id": {
+                    "type": "string",
+                    "description": "Task list ID or '@default' for the primary list (default: '@default').",
+                },
+            },
+            "required": ["task_title_or_id"],
+        },
+    },
+    {
+        "name": "delete_task",
+        "description": (
+            "Deletes a task from a Google Tasks list. "
+            "Use this when the owner asks to remove, delete, or erase a task. "
+            "Finds the task by title (partial match) or by its ID."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_title_or_id": {
+                    "type": "string",
+                    "description": "Task title (or substring) to search for, or the exact task ID.",
+                },
+                "list_id": {
+                    "type": "string",
+                    "description": "Task list ID or '@default' for the primary list (default: '@default').",
+                },
+            },
+            "required": ["task_title_or_id"],
+        },
+    },
 ]
