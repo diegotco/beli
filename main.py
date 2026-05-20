@@ -12,6 +12,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from config import config
 from brain.claude_client import BelisBrain
+from brain.openai_client import GPT4oClient
+from brain.router import Router
 from memory.manager import MemoryManager
 from channels.telegram import TelegramChannel
 from channels.whatsapp_webhook import handle_webhook
@@ -95,7 +97,16 @@ async def startup() -> None:
     await memory.initialize()
     set_memory(memory)
 
-    brain = BelisBrain(api_key=config.ANTHROPIC_API_KEY, model=config.CLAUDE_MODEL)
+    claude = BelisBrain(api_key=config.ANTHROPIC_API_KEY, model=config.CLAUDE_MODEL)
+
+    # Wire up GPT-4o routing if an OpenAI key is provided
+    if config.OPENAI_API_KEY:
+        gpt = GPT4oClient(api_key=config.OPENAI_API_KEY)
+        brain = Router(claude_brain=claude, gpt_client=gpt)
+        logger.info("Router active: Claude (tools) + GPT-4o (general chat)")
+    else:
+        brain = Router(claude_brain=claude, gpt_client=None)
+        logger.info("Router active: Claude only (no OPENAI_API_KEY set)")
 
     return memory, brain
 
