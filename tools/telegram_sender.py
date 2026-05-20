@@ -448,6 +448,79 @@ async def _describe_image(api_key: str, image_bytes: bytes, caption: str = "") -
 
 # ── Tool 4: Read full history of a specific chat ──────────────────────────────
 
+async def _process_single_message(
+    client,
+    msg,
+    entity,
+    transcriber,
+    groq_api_key: str,
+    anthropic_api_key: str,
+) -> str | None:
+    """
+    Processes one Telegram message into a formatted string.
+    Returns None for service messages that should be skipped.
+    All media operations (download + Vision/Whisper) happen here so they
+    can be run concurrently via asyncio.gather.
+    """
+    ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+
+    if msg.out:
+        sender = "Tú"
+    elif isinstance(entity, User):
+        sender = (entity.first_name or "Contacto").strip()
+    elif msg.sender:
+        sender = (getattr(msg.sender, "first_name", "") or "Miembro").strip()
+    else:
+        sender = "Miembro"
+
+    if msg.text:
+        body = msg.text[:200]
+
+    elif msg.voice or msg.audio:
+        if transcriber:
+            audio_bytes = await _download_msg_media(client, msg)
+            if audio_bytes:
+                filename = "voice.ogg" if msg.voice else "audio.mp3"
+                text = transcriber(groq_api_key, audio_bytes, filename)
+                body = f"[Audio] {text}" if not text.startswith("ERROR:") else "[audio — no se pudo transcribir]"
+            else:
+                body = "[audio — no se pudo descargar]"
+        else:
+            body = "[audio]"
+
+    elif msg.photo:
+        caption = msg.message or ""
+        if anthropic_api_key:
+            image_bytes = await _download_msg_media(client, msg)
+            if image_bytes:
+                description = await _describe_image(anthropic_api_key, image_bytes, caption)
+                body = f"[Imagen] {description}"
+            else:
+                body = "[imagen — no se pudo descargar]"
+        else:
+            body = f"[imagen{': ' + caption if caption else ''}]"
+
+    elif msg.sticker:
+        body = "[sticker]"
+
+    elif msg.video:
+        body = f"[video{': ' + msg.message if msg.message else ''}]"
+
+    elif msg.document:
+        fname = ""
+        if msg.document.attributes:
+            for attr in msg.document.attributes:
+                fname = getattr(attr, "file_name", "") or ""
+                if fname:
+                    break
+        body = f"[archivo: {fname}]" if fname else "[archivo]"
+
+    else:
+        return None  # service messages, polls, etc.
+
+    return f"[{ts}] {sender}: {body}"
+
+
 async def read_chat_history(
     api_id: int,
     api_hash: str,
@@ -461,7 +534,10 @@ async def read_chat_history(
     Works for individual contacts, groups, and channels.
     Transcribes voice/audio messages via Groq Whisper if groq_api_key is set.
     Describes images via Claude Vision if anthropic_api_key is set.
+    All media (images + audio) is processed concurrently for speed.
     """
+    import asyncio
+
     limit = min(max(1, limit), 100)
     logger.info(f"Reading chat history for '{chat_name}' (last {limit} messages).")
 
@@ -472,7 +548,6 @@ async def read_chat_history(
             if entity is None:
                 return f"No encontré ninguna conversación llamada '{chat_name}' en Telegram."
 
-            # Lazy-import transcriber only if needed
             transcriber = None
             if groq_api_key:
                 try:
@@ -481,77 +556,21 @@ async def read_chat_history(
                 except ImportError:
                     logger.warning("[Telegram] transcriber module not available")
 
-            messages = []
-            async for msg in client.iter_messages(entity, limit=limit):
-                ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+            # Collect all raw messages first (fast — no media processing yet)
+            raw_msgs = [msg async for msg in client.iter_messages(entity, limit=limit)]
 
-                if msg.out:
-                    sender = "Tú"
-                elif isinstance(entity, User):
-                    sender = (entity.first_name or "Contacto").strip()
-                elif msg.sender:
-                    sender = (getattr(msg.sender, "first_name", "") or "Miembro").strip()
-                else:
-                    sender = "Miembro"
+            # Process all messages concurrently (downloads + Vision/Whisper in parallel)
+            results = await asyncio.gather(*[
+                _process_single_message(client, msg, entity, transcriber, groq_api_key, anthropic_api_key)
+                for msg in raw_msgs
+            ])
 
-                # ── Text message ──────────────────────────────────────────────
-                if msg.text:
-                    body = msg.text[:200]
-
-                # ── Voice note / audio ────────────────────────────────────────
-                elif msg.voice or msg.audio:
-                    if transcriber:
-                        audio_bytes = await _download_msg_media(client, msg)
-                        if audio_bytes:
-                            filename = "voice.ogg" if msg.voice else "audio.mp3"
-                            text = transcriber(groq_api_key, audio_bytes, filename)
-                            body = f"[Audio] {text}" if not text.startswith("ERROR:") else "[audio — no se pudo transcribir]"
-                        else:
-                            body = "[audio — no se pudo descargar]"
-                    else:
-                        body = "[audio]"
-
-                # ── Photo / image ─────────────────────────────────────────────
-                elif msg.photo:
-                    caption = msg.message or ""
-                    if anthropic_api_key:
-                        image_bytes = await _download_msg_media(client, msg)
-                        if image_bytes:
-                            description = await _describe_image(anthropic_api_key, image_bytes, caption)
-                            body = f"[Imagen] {description}"
-                        else:
-                            body = "[imagen — no se pudo descargar]"
-                    else:
-                        body = f"[imagen{': ' + caption if caption else ''}]"
-
-                # ── Sticker ───────────────────────────────────────────────────
-                elif msg.sticker:
-                    body = "[sticker]"
-
-                # ── Video ─────────────────────────────────────────────────────
-                elif msg.video:
-                    body = f"[video{': ' + msg.message if msg.message else ''}]"
-
-                # ── Document / file ───────────────────────────────────────────
-                elif msg.document:
-                    fname = ""
-                    if msg.document.attributes:
-                        for attr in msg.document.attributes:
-                            fname = getattr(attr, "file_name", "") or ""
-                            if fname:
-                                break
-                    body = f"[archivo: {fname}]" if fname else "[archivo]"
-
-                # ── Other media ───────────────────────────────────────────────
-                else:
-                    continue  # skip service messages, polls, etc.
-
-                messages.append(f"[{ts}] {sender}: {body}")
+            # Filter out skipped service messages and reverse to chronological order
+            messages = [r for r in reversed(results) if r is not None]
 
             if not messages:
                 return f"No encontré mensajes en la conversación con '{chat_name}'."
 
-            messages.reverse()  # chronological order
             return f"Últimos {len(messages)} mensajes de '{chat_name}':\n\n" + "\n".join(messages)
 
     except Exception as e:
