@@ -389,4 +389,27 @@ TOOLS = [
             "required": ["task_title_or_id"],
         },
     },
+    {
+        "name": "post_tweet",
+        "description": (
+            "Posts a tweet on @DiegoCapital_99 on X (Twitter). "
+            "Use when Diego asks to publish, post, or share something on X or Twitter. "
+            "If Diego sends a video file along with the text, set has_video=true. "
+            "ALWAYS show the exact tweet text and wait for explicit confirmation before posting."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The tweet text (max 280 characters).",
+                },
+                "has_video": {
+                    "type": "boolean",
+                    "description": "True if Diego provided a video file to attach to the tweet.",
+                },
+            },
+            "required": ["text"],
+        },
+    },
 ]

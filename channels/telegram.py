@@ -119,14 +119,14 @@ class TelegramChannel:
             self._job_monthly_reminder,
             time=datetime.time(hour=self.reminder_hour, minute=self.reminder_minute),
         )
-        # X activity monitor — every 15 minutes
+        # X activity monitor — every 5 minutes
         if self._x_bearer_token:
             self.app.job_queue.run_repeating(
                 self._job_x_monitor,
-                interval=900,
+                interval=300,
                 first=120,
             )
-            logger.info("X monitor active — polling every 15 minutes.")
+            logger.info("X monitor active — polling every 5 minutes.")
 
         # Daily birthday check — 6 AM CDMX
         if self._birthday_contacts_json and self._waha_url:
@@ -150,6 +150,10 @@ class TelegramChannel:
         # Voice notes
         self.app.add_handler(
             MessageHandler(filters.VOICE, self._handle_voice)
+        )
+        # Video files (for posting to X)
+        self.app.add_handler(
+            MessageHandler(filters.VIDEO | filters.Document.VIDEO, self._handle_video)
         )
         # Global error handler
         self.app.add_error_handler(self._error_handler)
@@ -499,6 +503,37 @@ class TelegramChannel:
         logger.info(f"Response sent to {user_name} (voice→text): {response[:80]}")
 
     # ------------------------------------------------------------------
+    async def _handle_video(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Handles video files sent by the owner — stores them for the next post_tweet call."""
+        from tools.executor import set_pending_video
+        if not update.message:
+            return
+
+        user_name = update.message.from_user.first_name if update.message.from_user else "Usuario"
+        caption = update.message.caption or ""
+
+        await update.message.chat.send_action(ChatAction.UPLOAD_VIDEO)
+
+        # Download video bytes
+        video = update.message.video or update.message.document
+        if not video:
+            return
+
+        tg_file = await context.bot.get_file(video.file_id)
+        video_bytes = await tg_file.download_as_bytearray()
+        filename = getattr(video, "file_name", None) or "video.mp4"
+
+        set_pending_video(bytes(video_bytes), filename)
+        logger.info(f"[Telegram] Video received from {user_name} ({len(video_bytes)} bytes) — stored for tweet.")
+
+        # If there's a caption, treat it as the tweet text and process normally
+        if caption.strip():
+            await self._process_message(update, context, caption.strip(), user_name)
+        else:
+            await update.message.reply_text(
+                "Video recibido. ¿Cuál es el texto que quieres publicar junto con él en X?"
+            )
+
     # JOBS & ERROR HANDLER
     # ------------------------------------------------------------------
 

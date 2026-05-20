@@ -23,6 +23,16 @@ logger = logging.getLogger("beli.tools.executor")
 # Lazy-loaded memory manager reference (set by main.py at startup)
 _memory = None
 
+# Optional video bytes to attach on the next post_tweet call (set by Telegram handler)
+_pending_video: bytes | None = None
+_pending_video_filename: str = "video.mp4"
+
+def set_pending_video(video_bytes: bytes | None, filename: str = "video.mp4") -> None:
+    """Called by the Telegram channel when the user sends a video with a tweet request."""
+    global _pending_video, _pending_video_filename
+    _pending_video = video_bytes
+    _pending_video_filename = filename
+
 def set_memory(memory) -> None:
     """Called at startup so executor can read user preferences like timezone."""
     global _memory
@@ -224,6 +234,28 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
             task_title_or_id=tool_input.get("task_title_or_id", ""),
             list_id=list_id,
+        )
+
+    if tool_name == "post_tweet":
+        from tools.x_monitor import post_tweet
+        global _pending_video, _pending_video_filename
+        video = _pending_video if tool_input.get("has_video") else None
+        filename = _pending_video_filename
+        _pending_video = None  # consume once
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                post_tweet,
+                api_key=config.X_API_KEY,
+                api_secret=config.X_API_SECRET,
+                bearer_token=config.X_BEARER_TOKEN,
+                access_token=config.X_ACCESS_TOKEN,
+                access_token_secret=config.X_ACCESS_TOKEN_SECRET,
+                text=tool_input.get("text", ""),
+                video_bytes=video,
+                video_filename=filename,
+            ),
         )
 
     logger.warning(f"Unknown tool called: {tool_name}")

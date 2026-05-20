@@ -154,6 +154,91 @@ def check_new_dms(client: tweepy.Client,
         return [], since_id
 
 
+def post_tweet(
+    api_key: str, api_secret: str, bearer_token: str,
+    access_token: str, access_token_secret: str,
+    text: str,
+    video_bytes: bytes | None = None,
+    video_filename: str = "video.mp4",
+) -> str:
+    """
+    Posts a tweet, optionally with a video attachment.
+    Returns a success or error string.
+    """
+    import tweepy.auth
+    import requests as req_lib
+    import time
+
+    client = build_client(api_key, api_secret, bearer_token, access_token, access_token_secret)
+
+    media_id = None
+    if video_bytes:
+        # Use v1.1 chunked upload for video
+        auth = tweepy.OAuth1UserHandler(api_key, api_secret, access_token, access_token_secret)
+        upload_url = "https://upload.twitter.com/1.1/media/upload.json"
+        headers = {}
+        auth_session = req_lib.Session()
+        auth_session.auth = auth
+
+        # INIT
+        init_resp = auth_session.post(upload_url, data={
+            "command": "INIT",
+            "media_type": "video/mp4",
+            "total_bytes": len(video_bytes),
+            "media_category": "tweet_video",
+        })
+        if init_resp.status_code not in (200, 201, 202):
+            return f"Error al inicializar la subida del video: {init_resp.text}"
+        media_id = init_resp.json()["media_id_string"]
+
+        # APPEND (in 5 MB chunks)
+        chunk_size = 5 * 1024 * 1024
+        for i, offset in enumerate(range(0, len(video_bytes), chunk_size)):
+            chunk = video_bytes[offset: offset + chunk_size]
+            append_resp = auth_session.post(upload_url, data={
+                "command": "APPEND",
+                "media_id": media_id,
+                "segment_index": i,
+            }, files={"media": chunk})
+            if append_resp.status_code not in (200, 201, 202, 204):
+                return f"Error al subir el video (segmento {i}): {append_resp.text}"
+
+        # FINALIZE
+        fin_resp = auth_session.post(upload_url, data={
+            "command": "FINALIZE",
+            "media_id": media_id,
+        })
+        if fin_resp.status_code not in (200, 201, 202):
+            return f"Error al finalizar la subida del video: {fin_resp.text}"
+
+        # Wait for processing
+        processing_info = fin_resp.json().get("processing_info")
+        while processing_info and processing_info.get("state") in ("pending", "in_progress"):
+            wait = processing_info.get("check_after_secs", 3)
+            time.sleep(wait)
+            status_resp = auth_session.get(upload_url, params={
+                "command": "STATUS", "media_id": media_id
+            })
+            processing_info = status_resp.json().get("processing_info", {})
+            if processing_info.get("state") == "failed":
+                return f"Error al procesar el video: {processing_info}"
+
+        logger.info(f"[X] Video uploaded successfully, media_id={media_id}")
+
+    # Post tweet
+    try:
+        kwargs: dict = {"text": text}
+        if media_id:
+            kwargs["media_ids"] = [media_id]
+        resp = client.create_tweet(**kwargs)
+        tweet_id = resp.data["id"]
+        logger.info(f"[X] Tweet posted: {tweet_id}")
+        return f"✓ Tweet publicado exitosamente (id: {tweet_id})"
+    except Exception as e:
+        logger.error(f"[X] Error posting tweet: {e}")
+        return f"Error al publicar el tweet: {e}"
+
+
 def format_notifications(mentions: list[dict], like_changes: list[dict],
                          dms: list[dict]) -> list[str]:
     """Formats activity into Telegram-ready strings."""
