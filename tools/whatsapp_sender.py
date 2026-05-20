@@ -305,8 +305,16 @@ def read_whatsapp_chat_history(
             else:
                 dt = ""
 
+            # Detect audio by type OR by hasMedia with empty body (WAHA sometimes omits type)
+            nested_type = msg.get("_data", {}).get("type", "")
+            effective_type = msg_type or nested_type
+            is_audio = effective_type in ("ptt", "audio") or (
+                has_media and not (msg.get("body") or msg.get("caption"))
+                and effective_type not in ("image", "video", "document", "sticker")
+            )
+
             # Audio / voice note
-            if msg_type in ("ptt", "audio"):
+            if is_audio:
                 if has_media and transcriber:
                     msg_id    = msg.get("id", "")
                     media_url = msg.get("mediaUrl") or msg.get("_data", {}).get("mediaUrl")
