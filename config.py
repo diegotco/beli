@@ -104,6 +104,10 @@ class Config:
     REMINDER_MINUTE: int = int(os.getenv("REMINDER_MINUTE", "0"))
     REMINDER_DAYS_BEFORE_END: int = int(os.getenv("REMINDER_DAYS_BEFORE_END", "4"))
 
+    # Birthday greetings — JSON array stored in Railway only, never in git
+    BIRTHDAY_CONTACTS: str = os.getenv("BIRTHDAY_CONTACTS", "")
+    BIRTHDAY_HOUR: int = int(os.getenv("BIRTHDAY_HOUR", "6"))    # 6 AM CDMX
+
     @classmethod
     def validate(cls) -> None:
         """Checks that all critical variables are configured."""

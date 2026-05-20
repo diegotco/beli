@@ -128,6 +128,11 @@ def main() -> None:
         telegram_api_hash=config.TELEGRAM_API_HASH,
         owner_session_string=config.OWNER_SESSION_STRING,
         owner_chat_id=config.OWNER_TELEGRAM_CHAT_ID,
+        waha_url=config.WAHA_URL,
+        waha_session=config.WAHA_SESSION,
+        waha_api_key=config.WAHA_API_KEY,
+        birthday_contacts_json=config.BIRTHDAY_CONTACTS,
+        birthday_hour=config.BIRTHDAY_HOUR,
     )
 
     # ── WhatsApp webhook ──────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ import calendar
 import datetime
 import io
 import logging
+import zoneinfo
 from pathlib import Path
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -51,6 +52,12 @@ class TelegramChannel:
         telegram_api_hash: str = "",
         owner_session_string: str = "",
         owner_chat_id: int = 0,
+        # Birthday greetings via WhatsApp
+        waha_url: str = "",
+        waha_session: str = "default",
+        waha_api_key: str = "",
+        birthday_contacts_json: str = "",
+        birthday_hour: int = 6,
     ):
         self.token = token
         self.brain = brain
@@ -66,6 +73,13 @@ class TelegramChannel:
         self._tg_api_hash       = telegram_api_hash
         self._owner_session     = owner_session_string
         self._owner_chat_id     = owner_chat_id
+
+        # Birthday config
+        self._waha_url              = waha_url
+        self._waha_session          = waha_session
+        self._waha_api_key          = waha_api_key
+        self._birthday_contacts_json = birthday_contacts_json
+        self._birthday_hour         = birthday_hour
 
         self.app = Application.builder().token(token).post_init(self._post_init).build()
         self._register_handlers()
@@ -92,6 +106,17 @@ class TelegramChannel:
             self._job_monthly_reminder,
             time=datetime.time(hour=self.reminder_hour, minute=self.reminder_minute),
         )
+        # Daily birthday check — 6 AM CDMX
+        if self._birthday_contacts_json and self._waha_url:
+            self.app.job_queue.run_daily(
+                self._job_birthday_check,
+                time=datetime.time(
+                    hour=self._birthday_hour,
+                    minute=0,
+                    tzinfo=zoneinfo.ZoneInfo("America/Mexico_City"),
+                ),
+            )
+            logger.info(f"Birthday scheduler active — runs daily at {self._birthday_hour}:00 CDMX.")
         # Text messages
         self.app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message)
@@ -500,6 +525,19 @@ class TelegramChannel:
                 logger.info(f"Reminder sent to chat_id={chat_id}")
             except Exception as e:
                 logger.error(f"Failed to send reminder to chat_id={chat_id}: {e}")
+
+    async def _job_birthday_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Daily job at 6 AM CDMX: sends birthday WhatsApp messages."""
+        from tools.birthday_scheduler import check_and_send_birthdays
+        try:
+            check_and_send_birthdays(
+                waha_url=self._waha_url,
+                session=self._waha_session,
+                api_key=self._waha_api_key,
+                contacts_json=self._birthday_contacts_json,
+            )
+        except Exception as e:
+            logger.exception(f"Error in birthday check job: {e}")
 
     async def _error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Logs unhandled errors from the bot."""
