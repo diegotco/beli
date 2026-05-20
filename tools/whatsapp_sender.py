@@ -305,29 +305,34 @@ def read_whatsapp_chat_history(
             else:
                 dt = ""
 
-            # Audio / voice note — transcribe if Groq key is available
-            if msg_type in ("ptt", "audio") and has_media and transcriber:
-                msg_id    = msg.get("id", "")
-                media_url = msg.get("mediaUrl") or msg.get("_data", {}).get("mediaUrl")
+            # Audio / voice note
+            if msg_type in ("ptt", "audio"):
+                if has_media and transcriber:
+                    msg_id    = msg.get("id", "")
+                    media_url = msg.get("mediaUrl") or msg.get("_data", {}).get("mediaUrl")
 
-                audio_bytes = None
-                if media_url:
-                    try:
-                        audio_resp = requests.get(media_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
-                        audio_resp.raise_for_status()
-                        audio_bytes = audio_resp.content
-                    except Exception as e:
-                        logger.warning(f"[WhatsApp] Direct mediaUrl download failed: {e}")
+                    audio_bytes = None
+                    if media_url:
+                        try:
+                            audio_resp = requests.get(media_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
+                            audio_resp.raise_for_status()
+                            audio_bytes = audio_resp.content
+                        except Exception as e:
+                            logger.warning(f"[WhatsApp] Direct mediaUrl download failed: {e}")
 
-                if not audio_bytes and msg_id:
-                    audio_bytes = _download_media(waha_url, msg_id, session, api_key)
+                    if not audio_bytes and msg_id:
+                        audio_bytes = _download_media(waha_url, msg_id, session, api_key)
 
-                if audio_bytes:
-                    filename = "voice.ogg" if msg_type == "ptt" else "audio.ogg"
-                    text = transcriber(groq_api_key, audio_bytes, filename)
-                    body = f"[Audio] {text}" if not text.startswith("ERROR:") else "[audio — no se pudo transcribir]"
+                    if audio_bytes:
+                        filename = "voice.ogg" if msg_type == "ptt" else "audio.ogg"
+                        text = transcriber(groq_api_key, audio_bytes, filename)
+                        body = f"[Audio] {text}" if not text.startswith("ERROR:") else "[audio — no se pudo transcribir]"
+                    else:
+                        body = "[audio — no se pudo descargar]"
+                elif has_media:
+                    body = "[audio — no hay clave Groq para transcribir]"
                 else:
-                    body = "[audio — no se pudo descargar]"
+                    body = "[nota de voz]"
 
             else:
                 body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")

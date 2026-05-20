@@ -33,12 +33,26 @@ def _is_confirmation(message: str) -> bool:
     normalized = message.strip().lower().rstrip(".,!¡¿?")
     return normalized in _CONFIRMATION_PATTERNS or len(normalized.split()) <= 3
 
+# Keywords that indicate the last assistant turn involved a tool result
+_TOOL_RESULT_KEYWORDS = [
+    # Confirmation requests
+    "¿confirmas?", "confirmas", "¿envío", "¿lo envío", "¿procedo",
+    # Tool read results (reading chats, messages, calendar, tasks)
+    "revisé", "leí los mensajes", "encontré", "no encontré",
+    "no hay mensajes", "últimos", "mensajes con", "mensajes de",
+    "conversaciones", "chat", "tu agenda", "tu calendario",
+    "no pude", "parece que no",
+]
+
 def _history_has_pending_action(history: list[dict]) -> bool:
-    """Returns True if the last assistant message was asking for confirmation."""
+    """
+    Returns True if the last assistant message involved a tool action or result,
+    meaning the user's follow-up should go to Claude (not GPT-4o).
+    """
     for msg in reversed(history):
         if msg.get("role") == "assistant":
             content = (msg.get("content") or "").lower()
-            return any(k in content for k in ["¿confirmas?", "confirmas", "¿envío", "¿lo envío", "¿procedo"])
+            return any(k in content for k in _TOOL_RESULT_KEYWORDS)
     return False
 
 # Classifier model: Haiku is fast and cheap — only needs to output 1 token
