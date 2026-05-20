@@ -21,6 +21,26 @@ from brain.openai_client import GPT4oClient
 
 logger = logging.getLogger("beli.brain.router")
 
+# Short messages that confirm a pending action — must always go to Claude
+_CONFIRMATION_PATTERNS = [
+    "sí", "si", "dale", "confirma", "confirmado", "ok", "okay", "sí por favor",
+    "si por favor", "hazlo", "envíalo", "envíala", "mándalo", "mándala",
+    "adelante", "procede", "perfecto", "listo", "va", "claro", "sí señor",
+]
+
+def _is_confirmation(message: str) -> bool:
+    """Returns True if the message looks like a short confirmation."""
+    normalized = message.strip().lower().rstrip(".,!¡¿?")
+    return normalized in _CONFIRMATION_PATTERNS or len(normalized.split()) <= 3
+
+def _history_has_pending_action(history: list[dict]) -> bool:
+    """Returns True if the last assistant message was asking for confirmation."""
+    for msg in reversed(history):
+        if msg.get("role") == "assistant":
+            content = (msg.get("content") or "").lower()
+            return any(k in content for k in ["¿confirmas?", "confirmas", "¿envío", "¿lo envío", "¿procedo"])
+    return False
+
 # Classifier model: Haiku is fast and cheap — only needs to output 1 token
 _CLASSIFIER_MODEL = "claude-haiku-4-5-20251001"
 
@@ -74,6 +94,12 @@ class Router:
         """Routes the message to Claude (tools) or GPT-4o (chat)."""
         # If GPT-4o isn't configured, behave exactly like Claude
         if self.gpt is None or new_message is None:
+            return await self.claude.think(system_prompt, history, new_message, max_tokens)
+
+        # Confirmations must always go to Claude — GPT-4o has no tools and
+        # would output the tool call as plain text instead of executing it.
+        if _is_confirmation(new_message) and _history_has_pending_action(history):
+            logger.info("Router → Claude (confirmation of pending action)")
             return await self.claude.think(system_prompt, history, new_message, max_tokens)
 
         # Classify the message
