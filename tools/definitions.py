@@ -105,7 +105,10 @@ TOOLS = [
             "The recipient sees it as if the owner wrote it directly. "
             "Use when the owner says 'mándale por WhatsApp', 'escríbele por WhatsApp', etc. "
             "ALWAYS show a draft and wait for explicit confirmation before calling. "
-            "Accepts phone number ('+525561103975') or WhatsApp chat ID."
+            "Accepts phone number ('+525561103975') or WhatsApp chat ID. "
+            "For @mentions in groups: include the phone number (digits only) in the message text "
+            "as '@{number}' and pass it in the mentions array. WhatsApp shows the contact's name, not the number. "
+            "Never show phone numbers in Telegram — use them silently in this tool only."
         ),
         "input_schema": {
             "type": "object",
@@ -116,7 +119,12 @@ TOOLS = [
                 },
                 "message": {
                     "type": "string",
-                    "description": "The exact message text to send.",
+                    "description": "The exact message text to send. For mentions use '@{digits}' e.g. '@593987370597'. WhatsApp displays the contact name.",
+                },
+                "mentions": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Phone numbers (digits only, no + or spaces) of people to @mention. e.g. ['593987370597']. Use when the message contains @mentions.",
                 },
             },
             "required": ["recipient", "message"],

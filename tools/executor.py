@@ -62,6 +62,7 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             message=tool_input.get("message", ""),
             session=config.WAHA_SESSION,
             api_key=config.WAHA_API_KEY,
+            mentions=tool_input.get("mentions"),
         )
 
     if tool_name == "read_whatsapp_chats":

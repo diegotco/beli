@@ -7,6 +7,7 @@ a clean REST API. All messages are sent FROM the owner's personal WhatsApp numbe
 WAHA API reference: https://waha.devlike.pro/docs/how-to/send-messages/
 """
 import logging
+import re
 from typing import Optional
 
 import requests
@@ -97,6 +98,7 @@ def send_whatsapp_message(
     message: str,
     session: str = _DEFAULT_SESSION,
     api_key: str = "",
+    mentions: list[str] | None = None,
 ) -> str:
     """
     Sends a WhatsApp text message FROM the owner's personal number.
@@ -105,18 +107,25 @@ def send_whatsapp_message(
         waha_url:  Base URL of the WAHA service (e.g. 'https://waha.up.railway.app')
         recipient: Phone number ('+525561103975'), WhatsApp chat ID ('525561103975@c.us'),
                    group ID ('120363xxxxxxxx@g.us'), or contact/group name ('Ñaños', 'Mom')
-        message:   Text to send
+        message:   Text to send. Use @{phone} (digits only) to mention someone, e.g. "@593987370597"
+        mentions:  List of phone numbers (digits only) to mention, e.g. ["593987370597"].
+                   WhatsApp will show the contact's saved name, not the number.
         session:   WAHA session name (default: 'default')
     """
     chat_id, display_label = _resolve_chat_id(waha_url, recipient, session, api_key)
 
-    # If resolution failed, surface the error immediately — don't try to send
     if chat_id is None:
         logger.error(f"[WhatsApp] Could not resolve recipient '{recipient}': {display_label}")
         return f"Error: {display_label}"
 
     url     = f"{waha_url.rstrip('/')}/api/sendText"
-    payload = {"session": session, "chatId": chat_id, "text": message}
+    payload: dict = {"session": session, "chatId": chat_id, "text": message}
+
+    # Add mentions array — WAHA expects "{number}@c.us" format
+    if mentions:
+        payload["mentions"] = [
+            f"{re.sub(r'[^0-9]', '', m)}@c.us" for m in mentions
+        ]
 
     logger.info(f"[WhatsApp] Sending to {chat_id}: {message[:60]}...")
 
