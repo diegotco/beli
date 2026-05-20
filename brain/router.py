@@ -26,6 +26,13 @@ _CONFIRMATION_PATTERNS = [
     "sí", "si", "dale", "confirma", "confirmado", "ok", "okay", "sí por favor",
     "si por favor", "hazlo", "envíalo", "envíala", "mándalo", "mándala",
     "adelante", "procede", "perfecto", "listo", "va", "claro", "sí señor",
+    # Longer natural confirmations
+    "sí está perfecto", "está perfecto", "si está perfecto",
+    "sí, perfecto", "perfecto, gracias", "sí gracias", "si gracias",
+    "sí, gracias", "dale gracias", "sí dale", "si dale",
+    "está bien", "me parece bien", "sí me parece bien",
+    "envíalo por favor", "sí envíalo", "si envíalo",
+    "sí, está perfecto, mil gracias", "si, esta perfecto, mil gracias",
 ]
 
 def _is_confirmation(message: str) -> bool:
@@ -35,13 +42,17 @@ def _is_confirmation(message: str) -> bool:
 
 # Keywords that indicate the last assistant turn involved a tool result
 _TOOL_RESULT_KEYWORDS = [
-    # Confirmation requests
+    # Confirmation requests (Beli asks "¿Confirmas?" before sending)
     "¿confirmas?", "confirmas", "¿envío", "¿lo envío", "¿procedo",
+    "voy a enviar", "voy a mandar", "como tú:", "como tu:",
+    "¿confirmas que envíe", "quieres que envíe", "¿lo mando",
     # Tool read results (reading chats, messages, calendar, tasks)
     "revisé", "leí los mensajes", "encontré", "no encontré",
     "no hay mensajes", "últimos", "mensajes con", "mensajes de",
     "conversaciones", "chat", "tu agenda", "tu calendario",
     "no pude", "parece que no",
+    # Draft confirmation (ghost mode)
+    "voy a enviarte", "te voy a enviar esto", "¿lo envío",
 ]
 
 def _history_has_pending_action(history: list[dict]) -> bool:
@@ -110,10 +121,16 @@ class Router:
         if self.gpt is None or new_message is None:
             return await self.claude.think(system_prompt, history, new_message, max_tokens)
 
-        # Confirmations must always go to Claude — GPT-4o has no tools and
-        # would output the tool call as plain text instead of executing it.
-        if _is_confirmation(new_message) and _history_has_pending_action(history):
-            logger.info("Router → Claude (confirmation of pending action)")
+        # If there's a pending action in history, always go to Claude —
+        # GPT-4o has no tools and would fabricate results instead of executing them.
+        # This applies regardless of message length (e.g. "Sí, está perfecto, mil gracias").
+        if _history_has_pending_action(history):
+            logger.info("Router → Claude (pending action in history)")
+            return await self.claude.think(system_prompt, history, new_message, max_tokens)
+
+        # Short confirmations without a detectable pending action also go to Claude
+        if _is_confirmation(new_message):
+            logger.info("Router → Claude (short confirmation, no detectable pending action)")
             return await self.claude.think(system_prompt, history, new_message, max_tokens)
 
         # Classify the message
