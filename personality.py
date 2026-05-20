@@ -204,9 +204,21 @@ def get_system_prompt(extra_context: str = "") -> str:
     weekdays_es = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     months_es   = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
                    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
+    # Calculate ISO week boundaries (Monday–Sunday)
+    week_start      = today - datetime.timedelta(days=today.weekday())
+    week_end        = week_start + datetime.timedelta(days=6)
+    next_week_start = week_start + datetime.timedelta(days=7)
+    next_week_end   = week_start + datetime.timedelta(days=13)
+
+    def _fmt(d: datetime.date) -> str:
+        return f"{d.day} de {months_es[d.month - 1]}"
+
     date_line = (
         f"Hoy es {weekdays_es[today.weekday()]} {today.day} de "
-        f"{months_es[today.month - 1]} de {today.year}."
+        f"{months_es[today.month - 1]} de {today.year}. "
+        f"La semana actual va del {_fmt(week_start)} al {_fmt(week_end)} (lunes a domingo). "
+        f"La próxima semana va del {_fmt(next_week_start)} al {_fmt(next_week_end)}."
     )
 
     cache_section = _load_contact_cache_section()
