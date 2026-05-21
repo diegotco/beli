@@ -59,6 +59,25 @@ else:
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=✅ Beli está en línea de nuevo."
 
       # ── WAHA (WhatsApp service) ───────────────────────────────────────────────
+      # Restore previous run's state FIRST so we can detect transitions.
+      # Both save and restore use the same path (/tmp/waha_state.txt) to avoid
+      # cache path-mismatch failures.
+      - name: Restore previous WAHA state from cache
+        id: waha_cache
+        continue-on-error: true
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/waha_state.txt
+          key: waha-state-${{ github.run_id }}
+          restore-keys: waha-state-
+
+      - name: Read previous WAHA state
+        id: waha_prev
+        continue-on-error: true
+        run: |
+          PREV=$(cat /tmp/waha_state.txt 2>/dev/null || echo "up")
+          echo "state=$PREV" >> "$GITHUB_OUTPUT"
+
       - name: Check WAHA /api/health endpoint
         id: check_waha
         continue-on-error: true
@@ -72,20 +91,6 @@ else:
           else
             echo "up" > /tmp/waha_state.txt
           fi
-
-      - name: Restore previous WAHA state from cache
-        id: waha_cache
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/waha_prev_state.txt
-          key: waha-state-${{ github.run_id }}
-          restore-keys: waha-state-
-
-      - name: Read previous WAHA state
-        id: waha_prev
-        run: |
-          PREV=$(cat /tmp/waha_prev_state.txt 2>/dev/null || echo "up")
-          echo "state=$PREV" >> "$GITHUB_OUTPUT"
 
       - name: Alert if WAHA is down
         if: steps.check_waha.outputs.failed == 'true' && steps.waha_prev.outputs.state == 'up'
@@ -105,6 +110,7 @@ else:
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=✅ WhatsApp (WAHA) está en línea de nuevo."
 
       - name: Save current WAHA state to cache
+        continue-on-error: true
         uses: actions/cache/save@v4
         with:
           path: /tmp/waha_state.txt
