@@ -21,6 +21,7 @@ jobs:
 
       - name: Alert if Beli is down
         if: steps.check_beli.outputs.failed == 'true'
+        continue-on-error: true
         run: |
           MSG="🚨 *Beli está caído* 🚨%0A%0AEl endpoint de salud devolvió HTTP ${{ steps.check_beli.outputs.status }} en lugar de 200.%0A%0ARailway debería reiniciarlo automáticamente — te avisaré cuando vuelva a estar en línea."
           curl -s -X POST \
@@ -30,6 +31,7 @@ jobs:
       - name: Check if Beli was previously down
         id: prev_beli
         if: steps.check_beli.outputs.failed != 'true'
+        continue-on-error: true
         run: |
           PREV=$(curl -s \
             -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
@@ -50,6 +52,7 @@ else:
 
       - name: Notify Beli back online
         if: steps.check_beli.outputs.failed != 'true' && steps.prev_beli.outputs.prev_conclusion == 'failure'
+        continue-on-error: true
         run: |
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
@@ -86,6 +89,7 @@ else:
 
       - name: Alert if WAHA is down
         if: steps.check_waha.outputs.failed == 'true' && steps.waha_prev.outputs.state == 'up'
+        continue-on-error: true
         run: |
           MSG="⚠️ WAHA (WhatsApp) está caído — HTTP ${{ steps.check_waha.outputs.status }}. Los mensajes de WhatsApp no se entregarán hasta que se recupere."
           curl -s -X POST \
@@ -94,6 +98,7 @@ else:
 
       - name: Notify WAHA back online
         if: steps.check_waha.outputs.failed != 'true' && steps.waha_prev.outputs.state == 'down'
+        continue-on-error: true
         run: |
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
