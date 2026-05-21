@@ -302,9 +302,10 @@ def read_whatsapp_chat_history(
                 else:
                     sender = phone_or_name.split()[0]
 
-            # Timestamp: use top-level only — _data.messageTimestamp is unreliable for
-            # outgoing messages (WAHA may stamp it with the cache time, not the send time)
-            ts = msg.get("timestamp") or 0
+            # Timestamp: prefer _data.t (raw WhatsApp protocol time, most reliable),
+            # then top-level timestamp. Avoid _data.messageTimestamp — unreliable for
+            # outgoing messages (WAHA may stamp with cache time, not original send time).
+            ts = msg.get("_data", {}).get("t") or msg.get("timestamp") or 0
             if ts:
                 try:
                     if ts > 9_999_999_999:   # guard against ms timestamps
@@ -356,7 +357,32 @@ def read_whatsapp_chat_history(
                         or msg.get("mediaUrl")
                         or msg.get("_data", {}).get("mediaUrl")
                     )
-                    logger.info(f"[WhatsApp] Attempting audio download — id={msg_id!r} mediaUrl={media_url!r} media_keys={list(media_obj.keys())}")
+
+                    # WAHA running inside Docker often returns internal localhost URLs.
+                    # Replace with the public WAHA base URL so we can actually reach it.
+                    if media_url and (
+                        media_url.startswith("/")
+                        or "localhost" in media_url
+                        or "127.0.0.1" in media_url
+                    ):
+                        import re as _re
+                        if media_url.startswith("/"):
+                            media_url = waha_url.rstrip("/") + media_url
+                        else:
+                            media_url = _re.sub(
+                                r'https?://(?:localhost|127\.0\.0\.1)(?::\d+)?',
+                                waha_url.rstrip("/"),
+                                media_url,
+                            )
+
+                    # Full diagnostic dump for audio messages
+                    import json as _json
+                    logger.info(
+                        f"[WhatsApp] AUDIO id={msg_id!r} "
+                        f"ts_top={msg.get('timestamp')} ts_data_t={msg.get('_data',{}).get('t')} "
+                        f"ts_data_msg={msg.get('_data',{}).get('messageTimestamp')} "
+                        f"mediaUrl={media_url!r} media={_json.dumps(media_obj)[:400]}"
+                    )
 
                     audio_bytes = None
                     if media_url:
@@ -366,7 +392,7 @@ def read_whatsapp_chat_history(
                             audio_bytes = audio_resp.content
                             logger.info(f"[WhatsApp] mediaUrl download OK — {len(audio_bytes)} bytes")
                         except Exception as e:
-                            logger.warning(f"[WhatsApp] mediaUrl download failed: {e}")
+                            logger.warning(f"[WhatsApp] mediaUrl download failed ({media_url!r}): {e}")
 
                     if not audio_bytes and msg_id:
                         logger.info(f"[WhatsApp] Trying /download endpoint for msg_id={msg_id!r}")
