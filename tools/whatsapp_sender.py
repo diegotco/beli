@@ -302,15 +302,12 @@ def read_whatsapp_chat_history(
                 else:
                     sender = phone_or_name.split()[0]
 
-            # WAHA v2 uses _data.messageTimestamp (seconds); fallback to top-level timestamp
-            ts = (
-                msg.get("timestamp")
-                or msg.get("_data", {}).get("messageTimestamp")
-            )
+            # Timestamp: use top-level only — _data.messageTimestamp is unreliable for
+            # outgoing messages (WAHA may stamp it with the cache time, not the send time)
+            ts = msg.get("timestamp") or 0
             if ts:
                 try:
-                    # Guard against millisecond timestamps (JS APIs sometimes return ms)
-                    if ts > 9_999_999_999:
+                    if ts > 9_999_999_999:   # guard against ms timestamps
                         ts = ts // 1000
                     dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d %b %H:%M")
                 except Exception:
@@ -318,49 +315,48 @@ def read_whatsapp_chat_history(
             else:
                 dt = ""
 
-            # Detect audio — WAHA is inconsistent: sometimes omits type, hasMedia, or both.
-            # Use all available signals: type, _data.type, mimetype, and hasMedia+empty-body.
+            # Detect audio — read mimetype from all available sources FIRST, then decide.
             nested_type = msg.get("_data", {}).get("type", "")
             effective_type = msg_type or nested_type
+            media_obj = msg.get("media") or {}
             mimetype = (
-                msg.get("mimetype", "")
+                media_obj.get("mimetype", "")           # WAHA v2: media.mimetype
+                or msg.get("mimetype", "")
                 or msg.get("_data", {}).get("mimetype", "")
             ).lower()
+
+            # Only use the hasMedia fallback if there's truly no type info AND
+            # the mimetype doesn't indicate a non-audio media type.
+            # This prevents images/videos with missing type from being flagged as audio.
             is_audio = (
                 effective_type in ("ptt", "audio")
                 or "audio" in mimetype
+                # Conservative fallback: only when has_media, no body, AND
+                # mimetype is explicitly empty (not just non-audio)
                 or (
                     has_media
                     and not (msg.get("body") or msg.get("caption"))
                     and effective_type not in ("image", "video", "document", "sticker")
-                    and "image" not in mimetype
-                    and "video" not in mimetype
+                    and mimetype == ""   # only if we truly have NO type info at all
                 )
             )
-            # Log full message structure for any media/unknown message to aid diagnosis
-            if not msg.get("body") and not msg.get("caption"):
+            if not msg.get("body") and not msg.get("caption") and has_media:
                 logger.info(
-                    f"[WhatsApp] no-body msg — type={msg_type!r} nested={nested_type!r} "
-                    f"mimetype={mimetype!r} hasMedia={has_media} is_audio={is_audio} "
-                    f"keys={list(msg.keys())} _data_keys={list(msg.get('_data', {}).keys())}"
+                    f"[WhatsApp] media msg — type={msg_type!r} nested={nested_type!r} "
+                    f"mimetype={mimetype!r} is_audio={is_audio} media_keys={list(media_obj.keys())}"
                 )
 
             # Audio / voice note
             if is_audio:
                 if has_media and transcriber:
                     msg_id    = msg.get("id", "")
-                    # WAHA v2 puts media info in msg["media"]["url"]; older versions use mediaUrl
-                    media_obj = msg.get("media") or {}
+                    # media_obj already set above; try all URL locations
                     media_url = (
                         media_obj.get("url")
                         or msg.get("mediaUrl")
                         or msg.get("_data", {}).get("mediaUrl")
                     )
-                    # Also grab mimetype from media object if available
-                    if not mimetype and media_obj.get("mimetype"):
-                        mimetype = media_obj["mimetype"].lower()
-
-                    logger.info(f"[WhatsApp] Attempting audio download — id={msg_id!r} mediaUrl={media_url!r} media_obj_keys={list(media_obj.keys())}")
+                    logger.info(f"[WhatsApp] Attempting audio download — id={msg_id!r} mediaUrl={media_url!r} media_keys={list(media_obj.keys())}")
 
                     audio_bytes = None
                     if media_url:
