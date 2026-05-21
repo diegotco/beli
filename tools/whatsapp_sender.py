@@ -272,7 +272,11 @@ async def read_whatsapp_chat_history(
         except Exception:
             tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
 
-        # Lazy-import transcriber only if we'll need it
+        import asyncio as _asyncio
+        import re as _re
+        import json as _json
+
+        # Lazy-import transcriber
         transcriber = None
         if groq_api_key:
             try:
@@ -281,20 +285,56 @@ async def read_whatsapp_chat_history(
             except ImportError:
                 logger.warning("[WhatsApp] transcriber module not available")
 
-        lines = []
-        for msg in reversed(messages):
-            msg_type = msg.get("type", "")
+        def _fix_url(url: str) -> str:
+            """Replace WAHA-internal localhost URLs with the public WAHA base URL."""
+            if not url:
+                return url
+            if url.startswith("/"):
+                return waha_url.rstrip("/") + url
+            if "localhost" in url or "127.0.0.1" in url:
+                return _re.sub(
+                    r'https?://(?:localhost|127\.0\.0\.1)(?::\d+)?',
+                    waha_url.rstrip("/"),
+                    url,
+                )
+            return url
+
+        def _get_media_bytes(msg: dict, media_obj: dict) -> bytes | None:
+            """Downloads media bytes: tries direct URL first, then /download endpoint."""
+            raw_url = (
+                media_obj.get("url")
+                or msg.get("mediaUrl")
+                or msg.get("_data", {}).get("mediaUrl")
+            )
+            media_url = _fix_url(raw_url)
+
+            if media_url:
+                try:
+                    r = requests.get(media_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
+                    r.raise_for_status()
+                    return r.content
+                except Exception as e:
+                    logger.warning(f"[WhatsApp] Direct URL download failed ({media_url!r}): {e}")
+
+            msg_id = msg.get("id", "")
+            if msg_id:
+                return _download_media(waha_url, msg_id, session, api_key)
+            return None
+
+        async def _process_msg(msg: dict) -> str:
+            """Processes one WAHA message into a formatted '[dt] sender: body' string."""
+            msg_type  = msg.get("type", "")
             has_media = msg.get("hasMedia", False)
             from_me   = msg.get("fromMe", False)
+
+            # ── Sender ───────────────────────────────────────────────────────
             if from_me:
                 sender = "Tú"
             else:
-                # For group messages, 'author' or 'participant' holds the individual sender's JID
-                author_jid = msg.get("author") or msg.get("participant") or ""
+                author_jid  = msg.get("author") or msg.get("participant") or ""
                 notify_name = (
                     msg.get("_data", {}).get("notifyName")
-                    or msg.get("notifyName")
-                    or ""
+                    or msg.get("notifyName") or ""
                 )
                 if notify_name:
                     sender = notify_name
@@ -303,13 +343,11 @@ async def read_whatsapp_chat_history(
                 else:
                     sender = phone_or_name.split()[0]
 
-            # Timestamp: prefer _data.t (raw WhatsApp protocol time, most reliable),
-            # then top-level timestamp. Avoid _data.messageTimestamp — unreliable for
-            # outgoing messages (WAHA may stamp with cache time, not original send time).
+            # ── Timestamp ────────────────────────────────────────────────────
             ts = msg.get("_data", {}).get("t") or msg.get("timestamp") or 0
             if ts:
                 try:
-                    if ts > 9_999_999_999:   # guard against ms timestamps
+                    if ts > 9_999_999_999:
                         ts = ts // 1000
                     dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d/%m/%Y %H:%M")
                 except Exception:
@@ -317,92 +355,45 @@ async def read_whatsapp_chat_history(
             else:
                 dt = ""
 
-            # Detect audio — read mimetype from all available sources FIRST, then decide.
-            nested_type = msg.get("_data", {}).get("type", "")
+            # ── Media type detection ─────────────────────────────────────────
+            nested_type    = msg.get("_data", {}).get("type", "")
             effective_type = msg_type or nested_type
-            media_obj = msg.get("media") or {}
-            mimetype = (
-                media_obj.get("mimetype", "")           # WAHA v2: media.mimetype
+            media_obj      = msg.get("media") or {}
+            mimetype       = (
+                media_obj.get("mimetype", "")
                 or msg.get("mimetype", "")
                 or msg.get("_data", {}).get("mimetype", "")
             ).lower()
 
-            # Only use the hasMedia fallback if there's truly no type info AND
-            # the mimetype doesn't indicate a non-audio media type.
-            # This prevents images/videos with missing type from being flagged as audio.
             is_audio = (
                 effective_type in ("ptt", "audio")
                 or "audio" in mimetype
-                # Conservative fallback: only when has_media, no body, AND
-                # mimetype is explicitly empty (not just non-audio)
                 or (
                     has_media
                     and not (msg.get("body") or msg.get("caption"))
                     and effective_type not in ("image", "video", "document", "sticker")
-                    and mimetype == ""   # only if we truly have NO type info at all
+                    and mimetype == ""
                 )
             )
+            is_image = not is_audio and (
+                effective_type == "image" or "image/" in mimetype
+            )
+
             if not msg.get("body") and not msg.get("caption") and has_media:
                 logger.info(
-                    f"[WhatsApp] media msg — type={msg_type!r} nested={nested_type!r} "
-                    f"mimetype={mimetype!r} is_audio={is_audio} media_keys={list(media_obj.keys())}"
+                    f"[WhatsApp] media — type={msg_type!r} nested={nested_type!r} "
+                    f"mimetype={mimetype!r} is_audio={is_audio} is_image={is_image}"
                 )
 
-            # Audio / voice note
+            # ── Body ─────────────────────────────────────────────────────────
             if is_audio:
                 if has_media and transcriber:
-                    msg_id    = msg.get("id", "")
-                    # media_obj already set above; try all URL locations
-                    media_url = (
-                        media_obj.get("url")
-                        or msg.get("mediaUrl")
-                        or msg.get("_data", {}).get("mediaUrl")
-                    )
-
-                    # WAHA running inside Docker often returns internal localhost URLs.
-                    # Replace with the public WAHA base URL so we can actually reach it.
-                    if media_url and (
-                        media_url.startswith("/")
-                        or "localhost" in media_url
-                        or "127.0.0.1" in media_url
-                    ):
-                        import re as _re
-                        if media_url.startswith("/"):
-                            media_url = waha_url.rstrip("/") + media_url
-                        else:
-                            media_url = _re.sub(
-                                r'https?://(?:localhost|127\.0\.0\.1)(?::\d+)?',
-                                waha_url.rstrip("/"),
-                                media_url,
-                            )
-
-                    # Full diagnostic dump for audio messages
-                    import json as _json
                     logger.info(
-                        f"[WhatsApp] AUDIO id={msg_id!r} "
+                        f"[WhatsApp] AUDIO id={msg.get('id','')!r} "
                         f"ts_top={msg.get('timestamp')} ts_data_t={msg.get('_data',{}).get('t')} "
-                        f"ts_data_msg={msg.get('_data',{}).get('messageTimestamp')} "
-                        f"mediaUrl={media_url!r} media={_json.dumps(media_obj)[:400]}"
+                        f"media={_json.dumps(media_obj)[:200]}"
                     )
-
-                    audio_bytes = None
-                    if media_url:
-                        try:
-                            audio_resp = requests.get(media_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
-                            audio_resp.raise_for_status()
-                            audio_bytes = audio_resp.content
-                            logger.info(f"[WhatsApp] mediaUrl download OK — {len(audio_bytes)} bytes")
-                        except Exception as e:
-                            logger.warning(f"[WhatsApp] mediaUrl download failed ({media_url!r}): {e}")
-
-                    if not audio_bytes and msg_id:
-                        logger.info(f"[WhatsApp] Trying /download endpoint for msg_id={msg_id!r}")
-                        audio_bytes = _download_media(waha_url, msg_id, session, api_key)
-                        if audio_bytes:
-                            logger.info(f"[WhatsApp] /download endpoint OK — {len(audio_bytes)} bytes")
-                        else:
-                            logger.warning(f"[WhatsApp] /download endpoint also failed for msg_id={msg_id!r}")
-
+                    audio_bytes = _get_media_bytes(msg, media_obj)
                     if audio_bytes:
                         filename = "voice.ogg" if msg_type == "ptt" else "audio.ogg"
                         text = transcriber(groq_api_key, audio_bytes, filename)
@@ -410,52 +401,13 @@ async def read_whatsapp_chat_history(
                     else:
                         body = "[audio — no se pudo descargar]"
                 elif has_media:
-                    body = "[audio — no hay clave Groq para transcribir]"
+                    body = "[audio — falta clave Groq]"
                 else:
                     body = "[nota de voz]"
 
-            else:
-                # Image — download and describe via Claude Vision
-                is_image = (
-                    effective_type == "image"
-                    or "image/" in mimetype
-                )
-                if is_image and has_media and anthropic_api_key:
-                    img_url = (
-                        media_obj.get("url")
-                        or msg.get("mediaUrl")
-                        or msg.get("_data", {}).get("mediaUrl")
-                    )
-                    # Fix localhost/relative URLs (same logic as audio)
-                    if img_url and (
-                        img_url.startswith("/")
-                        or "localhost" in img_url
-                        or "127.0.0.1" in img_url
-                    ):
-                        import re as _re2
-                        if img_url.startswith("/"):
-                            img_url = waha_url.rstrip("/") + img_url
-                        else:
-                            img_url = _re2.sub(
-                                r'https?://(?:localhost|127\.0\.0\.1)(?::\d+)?',
-                                waha_url.rstrip("/"),
-                                img_url,
-                            )
-
-                    img_bytes = None
-                    if img_url:
-                        try:
-                            img_resp = requests.get(img_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
-                            img_resp.raise_for_status()
-                            img_bytes = img_resp.content
-                        except Exception as e:
-                            logger.warning(f"[WhatsApp] Image URL download failed: {e}")
-
-                    if not img_bytes:
-                        msg_id = msg.get("id", "")
-                        if msg_id:
-                            img_bytes = _download_media(waha_url, msg_id, session, api_key)
-
+            elif is_image:
+                if has_media and anthropic_api_key:
+                    img_bytes = _get_media_bytes(msg, media_obj)
                     if img_bytes:
                         from tools.vision import describe_image
                         caption_text = msg.get("caption") or msg.get("body") or ""
@@ -464,9 +416,17 @@ async def read_whatsapp_chat_history(
                     else:
                         body = "[imagen — no se pudo descargar]"
                 else:
-                    body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")
+                    caption_text = msg.get("caption") or msg.get("body") or ""
+                    body = f"[imagen{': ' + caption_text if caption_text else ''}]"
 
-            lines.append(f"[{dt}] {sender}: {body[:2000]}")
+            else:
+                body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")
+
+            return f"[{dt}] {sender}: {body[:2000]}"
+
+        # Process all messages concurrently (audio + image in parallel)
+        results = await _asyncio.gather(*[_process_msg(msg) for msg in reversed(messages)])
+        lines = list(results)
 
         today_str = datetime.date.today().strftime("%d/%m/%Y")
         header = (
