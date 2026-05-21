@@ -338,17 +338,25 @@ def read_whatsapp_chat_history(
                     msg_id    = msg.get("id", "")
                     media_url = msg.get("mediaUrl") or msg.get("_data", {}).get("mediaUrl")
 
+                    logger.info(f"[WhatsApp] Attempting audio download — id={msg_id!r} mediaUrl={media_url!r}")
+
                     audio_bytes = None
                     if media_url:
                         try:
                             audio_resp = requests.get(media_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
                             audio_resp.raise_for_status()
                             audio_bytes = audio_resp.content
+                            logger.info(f"[WhatsApp] mediaUrl download OK — {len(audio_bytes)} bytes")
                         except Exception as e:
-                            logger.warning(f"[WhatsApp] Direct mediaUrl download failed: {e}")
+                            logger.warning(f"[WhatsApp] mediaUrl download failed: {e}")
 
                     if not audio_bytes and msg_id:
+                        logger.info(f"[WhatsApp] Trying /download endpoint for msg_id={msg_id!r}")
                         audio_bytes = _download_media(waha_url, msg_id, session, api_key)
+                        if audio_bytes:
+                            logger.info(f"[WhatsApp] /download endpoint OK — {len(audio_bytes)} bytes")
+                        else:
+                            logger.warning(f"[WhatsApp] /download endpoint also failed for msg_id={msg_id!r}")
 
                     if audio_bytes:
                         filename = "voice.ogg" if msg_type == "ptt" else "audio.ogg"
