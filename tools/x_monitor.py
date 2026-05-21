@@ -161,6 +161,98 @@ def check_new_dms(client: tweepy.Client,
         return [], since_id
 
 
+def get_my_tweets(
+    api_key: str, api_secret: str, bearer_token: str,
+    access_token: str, access_token_secret: str,
+    count: int = 5,
+) -> str:
+    """
+    Returns Diego's most recent tweets with engagement metrics.
+    count: how many tweets to retrieve (max 10).
+    """
+    client = build_client(api_key, api_secret, bearer_token, access_token, access_token_secret)
+    user_id = get_user_id(client)
+    if not user_id:
+        return "No pude obtener el ID de usuario de @DiegoCapital_99."
+
+    try:
+        resp = client.get_users_tweets(
+            user_id,
+            max_results=min(count, 10),
+            tweet_fields=["public_metrics", "text", "created_at"],
+            exclude=["retweets"],
+        )
+        if not resp.data:
+            return "No encontré tweets recientes en @DiegoCapital_99."
+
+        lines = [f"Últimos {len(resp.data)} tweets de @DiegoCapital_99:\n"]
+        for i, tweet in enumerate(resp.data, 1):
+            pm = tweet.public_metrics or {}
+            date_str = tweet.created_at.strftime("%d/%m/%Y %H:%M") if tweet.created_at else "?"
+            lines.append(
+                f"{i}. [{date_str}]\n"
+                f"   {tweet.text[:200]}\n"
+                f"   ❤️ {pm.get('like_count', 0)} likes · "
+                f"🔁 {pm.get('retweet_count', 0)} RTs · "
+                f"💬 {pm.get('reply_count', 0)} replies · "
+                f"👁 {pm.get('impression_count', '?')} vistas\n"
+            )
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.warning(f"[X] Error fetching own tweets: {e}")
+        return f"Error al consultar tus tweets: {e}"
+
+
+def get_my_mentions(
+    api_key: str, api_secret: str, bearer_token: str,
+    access_token: str, access_token_secret: str,
+    count: int = 10,
+) -> str:
+    """
+    Returns Diego's most recent mentions on X.
+    count: how many mentions to retrieve (max 10).
+    """
+    client = build_client(api_key, api_secret, bearer_token, access_token, access_token_secret)
+    user_id = get_user_id(client)
+    if not user_id:
+        return "No pude obtener el ID de usuario de @DiegoCapital_99."
+
+    try:
+        resp = client.get_users_mentions(
+            user_id,
+            max_results=min(count, 10),
+            tweet_fields=["created_at", "text", "public_metrics"],
+            expansions=["author_id"],
+            user_fields=["username", "name"],
+        )
+
+        users_by_id: dict = {}
+        if resp.includes and resp.includes.get("users"):
+            for u in resp.includes["users"]:
+                users_by_id[str(u.id)] = u
+
+        if not resp.data:
+            return "No hay menciones recientes en @DiegoCapital_99."
+
+        lines = [f"Últimas {len(resp.data)} menciones de @DiegoCapital_99:\n"]
+        for i, tweet in enumerate(resp.data, 1):
+            author = users_by_id.get(str(tweet.author_id))
+            author_str = f"@{author.username} ({author.name})" if author else f"(id {tweet.author_id})"
+            date_str = tweet.created_at.strftime("%d/%m/%Y %H:%M") if tweet.created_at else "?"
+            pm = tweet.public_metrics or {}
+            lines.append(
+                f"{i}. {author_str} [{date_str}]\n"
+                f"   {tweet.text[:200]}\n"
+                f"   ❤️ {pm.get('like_count', 0)} · 🔁 {pm.get('retweet_count', 0)}\n"
+            )
+        return "\n".join(lines)
+
+    except Exception as e:
+        logger.warning(f"[X] Error fetching mentions: {e}")
+        return f"Error al consultar menciones: {e}"
+
+
 def post_tweet(
     api_key: str, api_secret: str, bearer_token: str,
     access_token: str, access_token_secret: str,

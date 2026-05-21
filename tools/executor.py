@@ -277,6 +277,38 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             ),
         )
 
+    if tool_name == "get_x_my_tweets":
+        from tools.x_monitor import get_my_tweets
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                get_my_tweets,
+                api_key=config.X_API_KEY,
+                api_secret=config.X_API_SECRET,
+                bearer_token=config.X_BEARER_TOKEN,
+                access_token=config.X_ACCESS_TOKEN,
+                access_token_secret=config.X_ACCESS_TOKEN_SECRET,
+                count=int(tool_input.get("count", 5)),
+            ),
+        )
+
+    if tool_name == "get_x_mentions":
+        from tools.x_monitor import get_my_mentions
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            partial(
+                get_my_mentions,
+                api_key=config.X_API_KEY,
+                api_secret=config.X_API_SECRET,
+                bearer_token=config.X_BEARER_TOKEN,
+                access_token=config.X_ACCESS_TOKEN,
+                access_token_secret=config.X_ACCESS_TOKEN_SECRET,
+                count=int(tool_input.get("count", 10)),
+            ),
+        )
+
     if tool_name == "post_tweet":
         from tools.x_monitor import post_tweet
         global _pending_video, _pending_video_filename

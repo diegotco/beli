@@ -466,6 +466,42 @@ TOOLS = [
         },
     },
     {
+        "name": "get_x_my_tweets",
+        "description": (
+            "Returns Diego's most recent tweets from @DiegoCapital_99 with engagement metrics "
+            "(likes, retweets, replies, impressions). Use when Diego asks about his tweet stats, "
+            "performance, or wants to see his recent posts."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "description": "Number of recent tweets to retrieve (1–10, default 5).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_x_mentions",
+        "description": (
+            "Returns Diego's most recent mentions on X (@DiegoCapital_99). "
+            "Use when Diego asks who mentioned him, about his interactions, "
+            "or wants to see what people are saying about him on X."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer",
+                    "description": "Number of recent mentions to retrieve (1–10, default 10).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "post_tweet",
         "description": (
             "Posts a tweet on @DiegoCapital_99 on X (Twitter). "

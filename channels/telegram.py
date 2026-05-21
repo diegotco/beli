@@ -160,6 +160,18 @@ class TelegramChannel:
             )
             logger.info(f"Morning agenda active — runs daily at {self._morning_agenda_hour}:00 CDMX.")
 
+        # Daily DB backup — 3 AM CDMX
+        if self._owner_chat_id:
+            self.app.job_queue.run_daily(
+                self._job_db_backup,
+                time=datetime.time(
+                    hour=3,
+                    minute=0,
+                    tzinfo=zoneinfo.ZoneInfo("America/Mexico_City"),
+                ),
+            )
+            logger.info("DB backup job active — runs daily at 03:00 CDMX.")
+
         # Text messages
         self.app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message)
@@ -793,6 +805,37 @@ class TelegramChannel:
 
         except Exception as e:
             logger.exception(f"Error in morning agenda job: {e}")
+
+    async def _job_db_backup(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Daily job at 03:00 CDMX: sends SQLite database as a Telegram document backup."""
+        chat_id = self._owner_chat_id
+        if not chat_id:
+            return
+
+        import datetime as dt
+        from config import config
+
+        db_path = config.DB_PATH
+        if not db_path.exists():
+            logger.warning("DB backup: database file not found, skipping.")
+            return
+
+        try:
+            today = dt.date.today().strftime("%Y-%m-%d")
+            filename = f"beli_memory_backup_{today}.db"
+            with open(db_path, "rb") as f:
+                db_bytes = f.read()
+
+            size_kb = len(db_bytes) / 1024
+            await context.bot.send_document(
+                chat_id=chat_id,
+                document=db_bytes,
+                filename=filename,
+                caption=f"🗄️ Backup diario de Beli — {today} ({size_kb:.1f} KB)",
+            )
+            logger.info(f"DB backup sent to {chat_id} ({size_kb:.1f} KB).")
+        except Exception as e:
+            logger.exception(f"Error in DB backup job: {e}")
 
     async def _error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Logs unhandled errors from the bot."""
