@@ -11,6 +11,11 @@ logger = logging.getLogger("beli.transcriber")
 SUPPORTED_FORMATS = {"ogg", "mp3", "mp4", "mpeg", "mpga", "m4a", "wav", "webm", "flac"}
 WHISPER_MODEL = "whisper-large-v3-turbo"
 
+# If the average no_speech_prob across all segments exceeds this threshold,
+# the audio is considered silence/noise and we refuse to return a transcription
+# (Whisper hallucinates plausible-sounding text on silent/noisy input).
+_NO_SPEECH_THRESHOLD = 0.65
+
 
 def transcribe_audio(api_key: str, audio_bytes: bytes, filename: str = "voice.ogg") -> str:
     """
@@ -35,15 +40,38 @@ def transcribe_audio(api_key: str, audio_bytes: bytes, filename: str = "voice.og
         from groq import Groq
         client = Groq(api_key=api_key)
 
+        # verbose_json gives us segment-level confidence (no_speech_prob) so we can
+        # detect hallucinations on silent/noisy input.  temperature=0 reduces creativity.
         transcription = client.audio.transcriptions.create(
             model=WHISPER_MODEL,
             file=(filename, audio_bytes),
-            response_format="text",
+            response_format="verbose_json",
+            temperature=0,
         )
-        text = transcription.strip() if isinstance(transcription, str) else transcription.text.strip()
-        logger.info(f"Transcription successful ({len(text)} chars): {text[:80]}...")
+
+        # Hallucination guard — reject if Whisper thinks there's no speech
+        segments = getattr(transcription, "segments", None) or []
+        if segments:
+            probs = [
+                (s["no_speech_prob"] if isinstance(s, dict) else getattr(s, "no_speech_prob", 0))
+                for s in segments
+            ]
+            avg_no_speech = sum(probs) / len(probs)
+            logger.info(f"[Transcriber] avg_no_speech_prob={avg_no_speech:.3f} over {len(segments)} segments")
+            if avg_no_speech > _NO_SPEECH_THRESHOLD:
+                logger.warning(
+                    f"[Transcriber] Rejecting transcription — likely noise/silence "
+                    f"(avg_no_speech={avg_no_speech:.2f})"
+                )
+                return "ERROR: No se detectó voz clara en el audio (posible ruido o silencio)."
+
+        text = (getattr(transcription, "text", "") or "").strip()
+        if not text:
+            return "ERROR: El audio no contiene texto reconocible."
+
+        logger.info(f"[Transcriber] OK ({len(text)} chars, {len(segments)} segs): {text[:80]}")
         return text
 
     except Exception as e:
-        logger.exception(f"Transcription error: {e}")
+        logger.exception(f"[Transcriber] Error: {e}")
         return f"ERROR: Could not transcribe audio — {e}"

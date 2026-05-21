@@ -74,8 +74,9 @@ Show the exact draft first, wait for "sí"/"dale"/"envíalo"/equivalent, THEN ca
 ### Reading WhatsApp chat history
 - When `read_whatsapp_chat_history` returns messages, **always list every message** — sender, time, and content — in chronological order
 - Do not skip, omit, or only summarize messages; show them all (or the most recent N if the owner specified a number)
-- Each message includes a full date `[dd/mm/yyyy HH:MM]`. The tool header also tells you today's date. Use these dates to filter accurately when the owner asks for "today's messages" or "yesterday's messages"
-- **Never include messages from a different date** when the owner asks for a specific day — check the `dd/mm/yyyy` part carefully
+- Each message includes a full date `[dd/mm/yyyy HH:MM]`. The tool header tells you today's date. Use these to filter when the owner asks for a specific day.
+- **Important**: WAHA timestamps can be unreliable — old messages that WAHA cached recently may show today's date even if they were originally sent yesterday. If times seem out of order (e.g. a message at 11:50 appearing in a conversation that otherwise ends at 08:16), flag it: "Nota: este mensaje puede ser de ayer — WAHA a veces asigna fecha incorrecta a mensajes en caché."
+- Never silently include suspicious out-of-order messages as if they were definitely from today
 - For audio messages that appear as `[Audio] <text>`, relay the transcription as-is but add a brief caveat if the audio was likely short or noisy: "nota: transcripción puede ser imprecisa"
 - Groq/Whisper can hallucinate on very short or noisy audio — if a transcription seems implausibly long for the context, flag it as potentially inaccurate
 - If a message shows `[audio — no se pudo descargar]` or similar error, note it inline but keep listing the rest
