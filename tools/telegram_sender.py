@@ -417,33 +417,9 @@ async def _download_msg_media(client: TelegramClient, msg) -> bytes | None:
 
 
 async def _describe_image(api_key: str, image_bytes: bytes, caption: str = "") -> str:
-    """Describes an image via Claude Vision (single cheap API call). Returns description string."""
-    try:
-        import base64
-        import anthropic
-        client  = anthropic.AsyncAnthropic(api_key=api_key)
-        b64     = base64.b64encode(image_bytes).decode()
-        prompt  = "Describe esta imagen de forma concisa en 1-2 oraciones, en español."
-        if caption:
-            prompt += f" El caption del mensaje es: '{caption}'."
-        response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=150,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {"type": "base64", "media_type": "image/jpeg", "data": b64},
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }],
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        logger.warning(f"[Telegram] Image description failed: {e}")
-        return "[imagen — no se pudo describir]"
+    """Describes an image via Claude Vision. Delegates to tools/vision.py."""
+    from tools.vision import describe_image
+    return await describe_image(api_key, image_bytes, caption)
 
 
 # ── Tool 4: Read full history of a specific chat ──────────────────────────────

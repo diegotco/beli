@@ -87,7 +87,7 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
 
     if tool_name == "read_whatsapp_chat_history":
         tz = await _get_timezone()
-        return read_whatsapp_chat_history(
+        return await read_whatsapp_chat_history(
             waha_url=config.WAHA_URL,
             phone_or_name=tool_input.get("phone_or_name", ""),
             limit=tool_input.get("limit", 30),
@@ -95,6 +95,7 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             api_key=config.WAHA_API_KEY,
             timezone=tz,
             groq_api_key=config.GROQ_API_KEY,
+            anthropic_api_key=config.ANTHROPIC_API_KEY,
         )
 
     if tool_name == "send_email":

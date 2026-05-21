@@ -206,7 +206,7 @@ def _download_media(waha_url: str, message_id: str, session: str, api_key: str) 
         return None
 
 
-def read_whatsapp_chat_history(
+async def read_whatsapp_chat_history(
     waha_url: str,
     phone_or_name: str,
     limit: int = 30,
@@ -214,6 +214,7 @@ def read_whatsapp_chat_history(
     api_key: str = "",
     timezone: str = "America/Mexico_City",
     groq_api_key: str = "",
+    anthropic_api_key: str = "",
 ) -> str:
     """
     Reads the recent message history of a specific WhatsApp chat.
@@ -414,7 +415,56 @@ def read_whatsapp_chat_history(
                     body = "[nota de voz]"
 
             else:
-                body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")
+                # Image — download and describe via Claude Vision
+                is_image = (
+                    effective_type == "image"
+                    or "image/" in mimetype
+                )
+                if is_image and has_media and anthropic_api_key:
+                    img_url = (
+                        media_obj.get("url")
+                        or msg.get("mediaUrl")
+                        or msg.get("_data", {}).get("mediaUrl")
+                    )
+                    # Fix localhost/relative URLs (same logic as audio)
+                    if img_url and (
+                        img_url.startswith("/")
+                        or "localhost" in img_url
+                        or "127.0.0.1" in img_url
+                    ):
+                        import re as _re2
+                        if img_url.startswith("/"):
+                            img_url = waha_url.rstrip("/") + img_url
+                        else:
+                            img_url = _re2.sub(
+                                r'https?://(?:localhost|127\.0\.0\.1)(?::\d+)?',
+                                waha_url.rstrip("/"),
+                                img_url,
+                            )
+
+                    img_bytes = None
+                    if img_url:
+                        try:
+                            img_resp = requests.get(img_url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
+                            img_resp.raise_for_status()
+                            img_bytes = img_resp.content
+                        except Exception as e:
+                            logger.warning(f"[WhatsApp] Image URL download failed: {e}")
+
+                    if not img_bytes:
+                        msg_id = msg.get("id", "")
+                        if msg_id:
+                            img_bytes = _download_media(waha_url, msg_id, session, api_key)
+
+                    if img_bytes:
+                        from tools.vision import describe_image
+                        caption_text = msg.get("caption") or msg.get("body") or ""
+                        description = await describe_image(anthropic_api_key, img_bytes, caption_text)
+                        body = f"[Imagen] {description}"
+                    else:
+                        body = "[imagen — no se pudo descargar]"
+                else:
+                    body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")
 
             lines.append(f"[{dt}] {sender}: {body[:2000]}")
 
