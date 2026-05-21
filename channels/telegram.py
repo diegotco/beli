@@ -430,6 +430,15 @@ class TelegramChannel:
             status_text = "✅ Activado" if new_value else "🔕 Desactivado"
             await query.edit_message_reply_markup(reply_markup=self._notifications_keyboard(page))
             await query.answer(status_text, show_alert=False)
+
+            # Warn the user that X DMs require the Basic plan
+            if setting_key == "x_dms" and new_value:
+                await query.message.reply_text(
+                    "⚠️ Los DMs de X requieren el plan Basic ($100/mes) o superior.\n\n"
+                    "Con tu plan actual el toggle quedará activo pero no recibirás notificaciones de DMs.\n\n"
+                    "Puedes ver y contratar los planes aquí:\n"
+                    "https://developer.x.com/en/portal/products"
+                )
             return
 
         await query.answer()
