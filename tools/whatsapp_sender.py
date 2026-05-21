@@ -324,10 +324,13 @@ def read_whatsapp_chat_history(
                     and "video" not in mimetype
                 )
             )
-            logger.info(
-                f"[WhatsApp] msg type={msg_type!r} nested={nested_type!r} "
-                f"mimetype={mimetype!r} hasMedia={has_media} is_audio={is_audio}"
-            )
+            # Log full message structure for any media/unknown message to aid diagnosis
+            if not msg.get("body") and not msg.get("caption"):
+                logger.info(
+                    f"[WhatsApp] no-body msg — type={msg_type!r} nested={nested_type!r} "
+                    f"mimetype={mimetype!r} hasMedia={has_media} is_audio={is_audio} "
+                    f"keys={list(msg.keys())} _data_keys={list(msg.get('_data', {}).keys())}"
+                )
 
             # Audio / voice note
             if is_audio:
