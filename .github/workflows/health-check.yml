@@ -2,8 +2,12 @@ name: Beli Health Check
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # every 5 minutes
+    - cron: "*/10 * * * *"  # every 10 minutes
   workflow_dispatch:          # allow manual trigger for testing
+
+concurrency:
+  group: health-check
+  cancel-in-progress: true
 
 jobs:
   ping:
