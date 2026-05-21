@@ -305,12 +305,28 @@ def read_whatsapp_chat_history(
             else:
                 dt = ""
 
-            # Detect audio by type OR by hasMedia with empty body (WAHA sometimes omits type)
+            # Detect audio — WAHA is inconsistent: sometimes omits type, hasMedia, or both.
+            # Use all available signals: type, _data.type, mimetype, and hasMedia+empty-body.
             nested_type = msg.get("_data", {}).get("type", "")
             effective_type = msg_type or nested_type
-            is_audio = effective_type in ("ptt", "audio") or (
-                has_media and not (msg.get("body") or msg.get("caption"))
-                and effective_type not in ("image", "video", "document", "sticker")
+            mimetype = (
+                msg.get("mimetype", "")
+                or msg.get("_data", {}).get("mimetype", "")
+            ).lower()
+            is_audio = (
+                effective_type in ("ptt", "audio")
+                or "audio" in mimetype
+                or (
+                    has_media
+                    and not (msg.get("body") or msg.get("caption"))
+                    and effective_type not in ("image", "video", "document", "sticker")
+                    and "image" not in mimetype
+                    and "video" not in mimetype
+                )
+            )
+            logger.debug(
+                f"[WhatsApp] msg type={msg_type!r} nested={nested_type!r} "
+                f"mimetype={mimetype!r} hasMedia={has_media} is_audio={is_audio}"
             )
 
             # Audio / voice note

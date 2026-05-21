@@ -149,6 +149,13 @@ def check_new_dms(client: tweepy.Client,
 
         return dms, latest_id
 
+    except tweepy.Forbidden as e:
+        # DM access requires Basic ($100/mo) or higher X API plan — skip silently
+        logger.debug(f"[X] DM access not available on current API plan: {e}")
+        return [], since_id
+    except tweepy.Unauthorized as e:
+        logger.debug(f"[X] DM unauthorized (check access token scopes): {e}")
+        return [], since_id
     except Exception as e:
         logger.warning(f"[X] Error checking DMs: {e}")
         return [], since_id
