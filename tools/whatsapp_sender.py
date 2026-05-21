@@ -324,7 +324,7 @@ def read_whatsapp_chat_history(
                     and "video" not in mimetype
                 )
             )
-            logger.debug(
+            logger.info(
                 f"[WhatsApp] msg type={msg_type!r} nested={nested_type!r} "
                 f"mimetype={mimetype!r} hasMedia={has_media} is_audio={is_audio}"
             )
