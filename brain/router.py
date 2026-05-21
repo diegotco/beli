@@ -79,6 +79,7 @@ Tools are needed for:
 - Creating, editing, or deleting calendar events
 - Creating, completing, or deleting tasks / shopping list items
 - Setting timezone or preferences
+- Any X / Twitter action: posting tweets, creating polls, reading mentions, checking tweet stats
 - Any real-world action or data lookup from connected services
 
 Tools are NOT needed for:
