@@ -23,7 +23,7 @@ logger = logging.getLogger("beli.brain")
 MAX_TOOL_ROUNDS = 5  # Safety limit to prevent infinite tool loops
 
 # Tools that perform real-world sends — their results are the source of truth
-ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner"}
+ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner", "send_gmail_message"}
 
 # Signal returned by every successful tool execution (defined in email_sender,
 # telegram_sender, and whatsapp_sender).  This is the ONLY accepted proof of a completed send.
@@ -212,6 +212,10 @@ class BelisBrain:
             )
 
             if _claims_success(final_text) and not tool_confirmed_success and not is_asking_confirmation:
+                logger.error(
+                    f"HALLUCINATION GUARD fired — final_text[:300]={final_text[:300]!r} "
+                    f"action_tool_results={action_tool_results}"
+                )
                 if action_tool_results:
                     # Tools ran but returned an error — Claude is hiding the failure.
                     logger.error(
