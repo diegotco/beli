@@ -507,10 +507,11 @@ TOOLS = [
     {
         "name": "post_tweet",
         "description": (
-            "Posts a tweet on @DiegoCapital_99 on X (Twitter). "
+            "Posts a tweet or native X poll on @DiegoCapital_99. "
             "Use when Diego asks to publish, post, or share something on X or Twitter. "
+            "Use poll_options when Diego asks to create a poll/encuesta (2–4 options). "
             "If Diego sends a video file along with the text, set has_video=true. "
-            "ALWAYS show the exact tweet text and wait for explicit confirmation before posting."
+            "ALWAYS show the exact content and wait for explicit confirmation before posting."
         ),
         "input_schema": {
             "type": "object",
@@ -522,6 +523,15 @@ TOOLS = [
                 "has_video": {
                     "type": "boolean",
                     "description": "True if Diego provided a video file to attach to the tweet.",
+                },
+                "poll_options": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of 2–4 poll options for a native X poll. Cannot be combined with video.",
+                },
+                "poll_duration_hours": {
+                    "type": "integer",
+                    "description": "How long the poll runs in hours (1–168). Default 24.",
                 },
             },
             "required": ["text"],

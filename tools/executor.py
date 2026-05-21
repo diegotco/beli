@@ -328,6 +328,8 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
                 text=tool_input.get("text", ""),
                 video_bytes=video,
                 video_filename=filename,
+                poll_options=tool_input.get("poll_options") or None,
+                poll_duration_hours=int(tool_input.get("poll_duration_hours", 24)),
             ),
         )
 

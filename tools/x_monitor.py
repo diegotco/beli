@@ -259,9 +259,13 @@ def post_tweet(
     text: str,
     video_bytes: bytes | None = None,
     video_filename: str = "video.mp4",
+    poll_options: list[str] | None = None,
+    poll_duration_hours: int = 24,
 ) -> str:
     """
-    Posts a tweet, optionally with a video attachment.
+    Posts a tweet, optionally with a video attachment or a native X poll.
+    poll_options: list of 2–4 option strings (mutually exclusive with video).
+    poll_duration_hours: how long the poll runs (1–168 hours, default 24).
     Returns a success or error string.
     """
     import tweepy.auth
@@ -329,10 +333,17 @@ def post_tweet(
         kwargs: dict = {"text": text}
         if media_id:
             kwargs["media_ids"] = [media_id]
+        if poll_options:
+            if len(poll_options) < 2 or len(poll_options) > 4:
+                return "Error: una encuesta requiere entre 2 y 4 opciones."
+            duration_minutes = max(5, min(poll_duration_hours * 60, 10080))  # clamp 5 min – 7 days
+            kwargs["poll_options"] = poll_options
+            kwargs["poll_duration_minutes"] = duration_minutes
         resp = client.create_tweet(**kwargs)
         tweet_id = resp.data["id"]
-        logger.info(f"[X] Tweet posted: {tweet_id}")
-        return f"✓ Tweet publicado exitosamente (id: {tweet_id})"
+        kind = "Encuesta" if poll_options else "Tweet"
+        logger.info(f"[X] {kind} posted: {tweet_id}")
+        return f"✓ {kind} publicado exitosamente (id: {tweet_id})"
     except Exception as e:
         logger.error(f"[X] Error posting tweet: {e}")
         return f"Error al publicar el tweet: {e}"
