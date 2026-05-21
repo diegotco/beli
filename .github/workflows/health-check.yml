@@ -3,119 +3,34 @@ name: Beli Health Check
 on:
   schedule:
     - cron: "*/10 * * * *"  # every 10 minutes
-  workflow_dispatch:          # allow manual trigger for testing
+  workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      # ── Beli (web service) ────────────────────────────────────────────────────
-      - name: Check Beli /health endpoint
-        id: check_beli
-        continue-on-error: true
+      - name: Check Beli and WAHA
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            https://web-production-f3c9e.up.railway.app/health || echo "000")
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          if [ "$STATUS" != "200" ]; then echo "failed=true" >> "$GITHUB_OUTPUT"; fi
+          BELI=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            https://web-production-f3c9e.up.railway.app/health 2>/dev/null || echo "000")
 
-      - name: Alert if Beli is down
-        if: steps.check_beli.outputs.failed == 'true'
-        continue-on-error: true
-        run: |
-          MSG="🚨 *Beli está caído* 🚨%0A%0AEl endpoint de salud devolvió HTTP ${{ steps.check_beli.outputs.status }} en lugar de 200.%0A%0ARailway debería reiniciarlo automáticamente — te avisaré cuando vuelva a estar en línea."
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=${MSG}&parse_mode=Markdown"
+          WAHA=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            https://waha-production-7aac.up.railway.app/api/health 2>/dev/null || echo "000")
 
-      - name: Check if Beli was previously down
-        id: prev_beli
-        if: steps.check_beli.outputs.failed != 'true'
-        continue-on-error: true
-        run: |
-          PREV=$(curl -s \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/health-check.yml/runs?per_page=5&status=completed" \
-            | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-runs = data.get('workflow_runs', [])
-for r in runs[1:]:
-    if r['conclusion'] in ('failure', 'success'):
-        print(r['conclusion'])
-        break
-else:
-    print('success')
-")
-          echo "prev_conclusion=$PREV" >> "$GITHUB_OUTPUT"
+          echo "Beli: $BELI | WAHA: $WAHA"
 
-      - name: Notify Beli back online
-        if: steps.check_beli.outputs.failed != 'true' && steps.prev_beli.outputs.prev_conclusion == 'failure'
-        continue-on-error: true
-        run: |
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=✅ Beli está en línea de nuevo."
-
-      # ── WAHA (WhatsApp service) ───────────────────────────────────────────────
-      # Restore previous run's state FIRST so we can detect transitions.
-      # Both save and restore use the same path (/tmp/waha_state.txt) to avoid
-      # cache path-mismatch failures.
-      - name: Restore previous WAHA state from cache
-        id: waha_cache
-        continue-on-error: true
-        uses: actions/cache/restore@v4
-        with:
-          path: /tmp/waha_state.txt
-          key: waha-state-${{ github.run_id }}
-          restore-keys: waha-state-
-
-      - name: Read previous WAHA state
-        id: waha_prev
-        continue-on-error: true
-        run: |
-          PREV=$(cat /tmp/waha_state.txt 2>/dev/null || echo "up")
-          echo "state=$PREV" >> "$GITHUB_OUTPUT"
-
-      - name: Check WAHA /api/health endpoint
-        id: check_waha
-        continue-on-error: true
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
-            https://waha-production-7aac.up.railway.app/api/health || echo "000")
-          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
-          if [ "$STATUS" != "200" ]; then
-            echo "failed=true" >> "$GITHUB_OUTPUT"
-            echo "down" > /tmp/waha_state.txt
-          else
-            echo "up" > /tmp/waha_state.txt
+          if [ "$BELI" != "200" ]; then
+            curl -s -X POST \
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=🚨 Beli está caído (HTTP $BELI). Railway debería reiniciarlo automáticamente." \
+              || true
           fi
 
-      - name: Alert if WAHA is down
-        if: steps.check_waha.outputs.failed == 'true' && steps.waha_prev.outputs.state == 'up'
-        continue-on-error: true
-        run: |
-          MSG="⚠️ WAHA (WhatsApp) está caído — HTTP ${{ steps.check_waha.outputs.status }}. Los mensajes de WhatsApp no se entregarán hasta que se recupere."
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=${MSG}"
+          if [ "$WAHA" != "200" ]; then
+            curl -s -X POST \
+              "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+              -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=⚠️ WAHA (WhatsApp) está caído (HTTP $WAHA). Los mensajes de WhatsApp no se entregarán hasta que se recupere." \
+              || true
+          fi
 
-      - name: Notify WAHA back online
-        if: steps.check_waha.outputs.failed != 'true' && steps.waha_prev.outputs.state == 'down'
-        continue-on-error: true
-        run: |
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}&text=✅ WhatsApp (WAHA) está en línea de nuevo."
-
-      - name: Save current WAHA state to cache
-        continue-on-error: true
-        uses: actions/cache/save@v4
-        with:
-          path: /tmp/waha_state.txt
-          key: waha-state-${{ github.run_id }}
-
-      - name: Log healthy
-        if: steps.check_beli.outputs.failed != 'true' && steps.check_waha.outputs.failed != 'true'
-        run: echo "✅ Beli and WAHA are healthy"
+          echo "✅ Done (Beli=$BELI, WAHA=$WAHA)"
