@@ -468,9 +468,12 @@ TOOLS = [
     {
         "name": "get_x_my_tweets",
         "description": (
-            "Returns Diego's most recent tweets from @DiegoCapital_99 with engagement metrics "
-            "(likes, retweets, replies, impressions). Use when Diego asks about his tweet stats, "
-            "performance, or wants to see his recent posts."
+            "Returns Diego's most recent tweets from @DiegoCapital_99 with AGGREGATE engagement metrics "
+            "(total likes, retweets, replies, impressions per tweet). "
+            "Use when Diego asks about his tweet stats, performance, or wants to see his recent posts. "
+            "IMPORTANT: This tool only returns counts — it does NOT return usernames of who liked or "
+            "retweeted. Never invent or guess usernames. If Diego asks 'who liked my tweet', "
+            "tell him the X API does not expose individual likers."
         ),
         "input_schema": {
             "type": "object",
