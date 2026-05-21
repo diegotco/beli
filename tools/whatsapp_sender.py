@@ -416,7 +416,7 @@ def read_whatsapp_chat_history(
             else:
                 body = msg.get("body") or msg.get("caption") or (f"[{msg_type}]" if msg_type else "[media]")
 
-            lines.append(f"[{dt}] {sender}: {body[:200]}")
+            lines.append(f"[{dt}] {sender}: {body[:2000]}")
 
         return f"Últimos {len(lines)} mensajes con '{phone_or_name}':\n\n" + "\n".join(lines)
 
