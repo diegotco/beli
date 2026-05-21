@@ -121,6 +121,7 @@ class BelisBrain:
         # Collect results from action tools called during this turn.
         # Used by the anti-hallucination guard below.
         action_tool_results: list[str] = []
+        _hallucination_retry_done = False  # allow one automatic retry
 
         for round_num in range(MAX_TOOL_ROUNDS):
             logger.debug(f"Claude round {round_num + 1}, messages: {len(messages)}")
@@ -224,12 +225,28 @@ class BelisBrain:
                     )
                 else:
                     # No action tool was called at all — pure fabrication.
+                    # On first occurrence: inject a correction and retry silently.
+                    if not _hallucination_retry_done:
+                        _hallucination_retry_done = True
+                        logger.warning(
+                            "HALLUCINATION: claimed success without calling tool — injecting retry"
+                        )
+                        messages.append({"role": "assistant", "content": response.content})
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                "Error interno: respondiste con texto en lugar de llamar a la herramienta. "
+                                "Debes llamar AHORA al tool de envío correspondiente — no respondas con texto, "
+                                "solo ejecuta el tool call."
+                            ),
+                        })
+                        continue  # retry — Claude sees the correction
                     logger.error(
-                        "HALLUCINATION BLOCKED: Claude claimed success without calling any tool."
+                        "HALLUCINATION BLOCKED (2nd attempt): claimed success without any tool call."
                     )
                     return (
-                        "No ejecuté ninguna acción real — no llamé a ninguna herramienta. "
-                        "¿Quieres que lo intente ahora?"
+                        "Hubo un problema interno al ejecutar la acción. "
+                        "Por favor intenta enviar el mensaje de nuevo."
                     )
 
             return final_text
