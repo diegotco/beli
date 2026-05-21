@@ -131,6 +131,8 @@ def main() -> None:
         waha_url=config.WAHA_URL,
         waha_session=config.WAHA_SESSION,
         waha_api_key=config.WAHA_API_KEY,
+        google_calendar_credentials=config.GOOGLE_CALENDAR_CREDENTIALS,
+        morning_agenda_hour=config.MORNING_AGENDA_HOUR,
         birthday_contacts_json=config.BIRTHDAY_CONTACTS,
         birthday_hour=config.BIRTHDAY_HOUR,
         x_api_key=config.X_API_KEY,

@@ -109,7 +109,8 @@ class Config:
 
     # Birthday greetings — JSON array stored in Railway only, never in git
     BIRTHDAY_CONTACTS: str = os.getenv("BIRTHDAY_CONTACTS", "")
-    BIRTHDAY_HOUR: int = int(os.getenv("BIRTHDAY_HOUR", "6"))    # 6 AM CDMX
+    BIRTHDAY_HOUR: int = int(os.getenv("BIRTHDAY_HOUR", "6"))          # 6 AM CDMX
+    MORNING_AGENDA_HOUR: int = int(os.getenv("MORNING_AGENDA_HOUR", "8"))  # 8 AM CDMX
 
     # X / Twitter monitoring
     X_API_KEY: str = os.getenv("X_API_KEY", "")

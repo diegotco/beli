@@ -53,6 +53,9 @@ class TelegramChannel:
         telegram_api_hash: str = "",
         owner_session_string: str = "",
         owner_chat_id: int = 0,
+        # Morning agenda
+        google_calendar_credentials: str = "",
+        morning_agenda_hour: int = 8,
         # Birthday greetings via WhatsApp
         waha_url: str = "",
         waha_session: str = "default",
@@ -80,6 +83,10 @@ class TelegramChannel:
         self._tg_api_hash       = telegram_api_hash
         self._owner_session     = owner_session_string
         self._owner_chat_id     = owner_chat_id
+
+        # Morning agenda config
+        self._calendar_credentials  = google_calendar_credentials
+        self._morning_agenda_hour   = morning_agenda_hour
 
         # Birthday config
         self._waha_url              = waha_url
@@ -140,6 +147,19 @@ class TelegramChannel:
                 ),
             )
             logger.info(f"Birthday scheduler active — runs daily at {self._birthday_hour}:00 CDMX.")
+
+        # Daily morning agenda — runs at morning_agenda_hour in owner's timezone
+        if self._calendar_credentials:
+            self.app.job_queue.run_daily(
+                self._job_morning_agenda,
+                time=datetime.time(
+                    hour=self._morning_agenda_hour,
+                    minute=0,
+                    tzinfo=zoneinfo.ZoneInfo("America/Mexico_City"),
+                ),
+            )
+            logger.info(f"Morning agenda active — runs daily at {self._morning_agenda_hour}:00 CDMX.")
+
         # Text messages
         self.app.add_handler(
             MessageHandler(filters.TEXT & ~filters.COMMAND, self._handle_message)
@@ -723,6 +743,47 @@ class TelegramChannel:
             )
         except Exception as e:
             logger.exception(f"Error in birthday check job: {e}")
+
+    async def _job_morning_agenda(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Daily job at morning_agenda_hour: sends the day's calendar agenda if toggle is on."""
+        from settings.notifications import get_settings
+        if not get_settings().is_enabled("calendar_reminders"):
+            return
+
+        chat_id = self._owner_chat_id
+        if not chat_id:
+            return
+
+        try:
+            from tools.calendar_tool import read_calendar_events
+            tz = await self.memory.get_setting("timezone", "America/Mexico_City")
+
+            # Get today's events only (days_ahead=1)
+            events_text = read_calendar_events(
+                credentials_json=self._calendar_credentials,
+                days_ahead=1,
+                max_results=20,
+                timezone=tz,
+            )
+
+            import datetime, zoneinfo
+            tz_info  = zoneinfo.ZoneInfo(tz)
+            today    = datetime.datetime.now(tz_info)
+            weekdays = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+            months   = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+            date_str = f"{weekdays[today.weekday()]} {today.day} de {months[today.month - 1]}"
+
+            if "no hay eventos" in events_text.lower() or "no encontré" in events_text.lower():
+                msg = f"Buenos días, Diego. Hoy es {date_str}.\n\nNo tienes eventos agendados para hoy. ¡Buen día!"
+            else:
+                msg = f"Buenos días, Diego. Hoy es {date_str}.\n\nTu agenda de hoy:\n\n{events_text}"
+
+            await context.bot.send_message(chat_id=chat_id, text=msg)
+            logger.info(f"Morning agenda sent to {chat_id}.")
+
+        except Exception as e:
+            logger.exception(f"Error in morning agenda job: {e}")
 
     async def _error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Logs unhandled errors from the bot."""
