@@ -193,8 +193,11 @@ def read_whatsapp_chats(
 
 def _download_media(waha_url: str, message_id: str, session: str, api_key: str) -> bytes | None:
     """Downloads media bytes for a given WAHA message ID. Returns None on failure."""
+    from urllib.parse import quote
     try:
-        url = f"{waha_url.rstrip('/')}/api/{session}/messages/{message_id}/download"
+        # URL-encode the message ID — it contains @ and _ which need encoding
+        encoded_id = quote(message_id, safe="")
+        url = f"{waha_url.rstrip('/')}/api/{session}/messages/{encoded_id}/download"
         resp = requests.get(url, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
         resp.raise_for_status()
         return resp.content
@@ -299,9 +302,19 @@ def read_whatsapp_chat_history(
                 else:
                     sender = phone_or_name.split()[0]
 
-            ts = msg.get("timestamp", "")
+            # WAHA v2 uses _data.messageTimestamp (seconds); fallback to top-level timestamp
+            ts = (
+                msg.get("timestamp")
+                or msg.get("_data", {}).get("messageTimestamp")
+            )
             if ts:
-                dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d %b %H:%M")
+                try:
+                    # Guard against millisecond timestamps (JS APIs sometimes return ms)
+                    if ts > 9_999_999_999:
+                        ts = ts // 1000
+                    dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d %b %H:%M")
+                except Exception:
+                    dt = ""
             else:
                 dt = ""
 
@@ -336,9 +349,18 @@ def read_whatsapp_chat_history(
             if is_audio:
                 if has_media and transcriber:
                     msg_id    = msg.get("id", "")
-                    media_url = msg.get("mediaUrl") or msg.get("_data", {}).get("mediaUrl")
+                    # WAHA v2 puts media info in msg["media"]["url"]; older versions use mediaUrl
+                    media_obj = msg.get("media") or {}
+                    media_url = (
+                        media_obj.get("url")
+                        or msg.get("mediaUrl")
+                        or msg.get("_data", {}).get("mediaUrl")
+                    )
+                    # Also grab mimetype from media object if available
+                    if not mimetype and media_obj.get("mimetype"):
+                        mimetype = media_obj["mimetype"].lower()
 
-                    logger.info(f"[WhatsApp] Attempting audio download — id={msg_id!r} mediaUrl={media_url!r}")
+                    logger.info(f"[WhatsApp] Attempting audio download — id={msg_id!r} mediaUrl={media_url!r} media_obj_keys={list(media_obj.keys())}")
 
                     audio_bytes = None
                     if media_url:
