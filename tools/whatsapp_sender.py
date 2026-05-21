@@ -310,7 +310,7 @@ def read_whatsapp_chat_history(
                 try:
                     if ts > 9_999_999_999:   # guard against ms timestamps
                         ts = ts // 1000
-                    dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d %b %H:%M")
+                    dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d/%m/%Y %H:%M")
                 except Exception:
                     dt = ""
             else:
@@ -418,7 +418,13 @@ def read_whatsapp_chat_history(
 
             lines.append(f"[{dt}] {sender}: {body[:2000]}")
 
-        return f"Últimos {len(lines)} mensajes con '{phone_or_name}':\n\n" + "\n".join(lines)
+        today_str = datetime.date.today().strftime("%d/%m/%Y")
+        header = (
+            f"Historial del chat con '{phone_or_name}' — "
+            f"hoy es {today_str} (usa esta fecha para distinguir mensajes de hoy vs ayer).\n"
+            f"Cada mensaje incluye [dd/mm/yyyy HH:MM]. Filtra por fecha cuando el owner pida mensajes de un día específico.\n"
+        )
+        return header + f"Últimos {len(lines)} mensajes:\n\n" + "\n".join(lines)
 
     except Exception as e:
         logger.exception(f"[WhatsApp] Error reading history for {chat_id}: {e}")
