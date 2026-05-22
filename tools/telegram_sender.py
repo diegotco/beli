@@ -558,13 +558,41 @@ async def read_chat_history(
             if not messages:
                 return f"No encontré mensajes en la conversación con '{chat_name}'."
 
+            total = len(messages)
+
+            # ── Pre-compute last-3 per sender (put at the TOP so Claude reads it first) ──
+            from collections import defaultdict
+            sender_msgs: dict[str, list[tuple[int, str]]] = defaultdict(list)
+            for i, msg in enumerate(messages, 1):
+                if "] " in msg:
+                    rest = msg.split("] ", 1)[1]
+                    if ": " in rest:
+                        sender_name = rest.split(": ", 1)[0]
+                        sender_msgs[sender_name].append((i, msg))
+
+            summary_parts = [
+                "╔══ ÚLTIMOS MENSAJES POR REMITENTE ══╗",
+                "(Usa esta sección para responder preguntas sobre los últimos N mensajes de alguien.)",
+            ]
+            for sender, msgs in sorted(sender_msgs.items()):
+                last3 = msgs[-3:]
+                summary_parts.append(
+                    f"\n{sender} — últimos {min(3, len(msgs))} de {len(msgs)} mensajes (el más reciente al final):"
+                )
+                for num, m in last3:
+                    summary_parts.append(f"  [#{num}/{total}] {m}")
+            summary_parts.append("╚══════════════════════════════════╝\n")
+            summary_str = "\n".join(summary_parts) + "\n"
+
+            # ── Numbered full history ─────────────────────────────────────────────────
             header = (
-                f"Historial del chat de Telegram con '{chat_name}' — "
-                f"{len(messages)} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero, el más reciente al final).\n"
-                f"Cada línea: [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
-                f"IMPORTANTE: para encontrar los N mensajes más recientes de una persona, lee desde el FINAL de la lista hacia arriba.\n"
+                f"Historial completo del chat de Telegram con '{chat_name}' — "
+                f"{total} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero = #1, el más reciente al final = #{total}).\n"
+                f"Cada línea: [#N/{total}] [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
             )
-            return header + "\n".join(messages)
+            numbered = [f"[#{i}/{total}] {msg}" for i, msg in enumerate(messages, 1)]
+
+            return summary_str + header + "\n".join(numbered)
 
     except Exception as e:
         logger.exception(f"Error reading chat history for '{chat_name}': {e}")

@@ -344,7 +344,10 @@ async def read_whatsapp_chat_history(
                     sender = phone_or_name.split()[0]
 
             # ── Timestamp ────────────────────────────────────────────────────
-            ts_raw = msg.get("_data", {}).get("t") or msg.get("timestamp") or 0
+            # Prefer the top-level WAHA 'timestamp' field (guaranteed UTC Unix
+            # seconds) over the internal '_data.t' field (same value but WAHA
+            # sometimes omits it or gives a local-time value in older builds).
+            ts_raw = msg.get("timestamp") or msg.get("_data", {}).get("t") or 0
             dt = ""
             if ts_raw:
                 try:
@@ -436,14 +439,42 @@ async def read_whatsapp_chat_history(
         results = await _asyncio.gather(*[_process_msg(msg) for msg in reversed(messages)])
         lines = list(results)
 
-        today_str = datetime.date.today().strftime("%d/%m/%Y")
+        today_str = datetime.datetime.now(tz=tz_info).strftime("%d/%m/%Y")
+        total = len(lines)
+
+        # ── Pre-compute last-3 per sender (put at the TOP so Claude reads it first) ──
+        from collections import defaultdict
+        sender_msgs: dict[str, list[tuple[int, str]]] = defaultdict(list)
+        for i, line in enumerate(lines, 1):
+            if "] " in line:
+                rest = line.split("] ", 1)[1]
+                if ": " in rest:
+                    sender_name = rest.split(": ", 1)[0]
+                    sender_msgs[sender_name].append((i, line))
+
+        summary_parts = [
+            "╔══ ÚLTIMOS MENSAJES POR REMITENTE ══╗",
+            "(Usa esta sección para responder preguntas sobre los últimos N mensajes de alguien.)",
+        ]
+        for sender, msgs in sorted(sender_msgs.items()):
+            last3 = msgs[-3:]
+            summary_parts.append(
+                f"\n{sender} — últimos {min(3, len(msgs))} de {len(msgs)} mensajes (el más reciente al final):"
+            )
+            for num, m in last3:
+                summary_parts.append(f"  [#{num}/{total}] {m}")
+        summary_parts.append("╚══════════════════════════════════╝\n")
+        summary_str = "\n".join(summary_parts) + "\n"
+
+        # ── Numbered full history ─────────────────────────────────────────────────
         header = (
-            f"Historial del chat de WhatsApp con '{phone_or_name}' — "
-            f"hoy es {today_str}. {len(lines)} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero, el más reciente al final).\n"
-            f"Cada línea: [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
-            f"IMPORTANTE: para encontrar los N mensajes más recientes de una persona, lee desde el FINAL de la lista hacia arriba.\n"
+            f"Historial completo de WhatsApp con '{phone_or_name}' — hoy es {today_str}. "
+            f"{total} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero = #1, el más reciente = #{total}).\n"
+            f"Cada línea: [#N/{total}] [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
         )
-        return header + "\n".join(lines)
+        numbered = [f"[#{i}/{total}] {line}" for i, line in enumerate(lines, 1)]
+
+        return summary_str + header + "\n".join(numbered)
 
     except Exception as e:
         logger.exception(f"[WhatsApp] Error reading history for {chat_id}: {e}")

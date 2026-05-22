@@ -148,6 +148,15 @@ class TelegramChannel:
             )
             logger.info(f"Birthday scheduler active — runs daily at {self._birthday_hour}:00 CDMX.")
 
+        # WAHA health monitor — every 5 minutes
+        if self._waha_url and self._owner_chat_id:
+            self.app.job_queue.run_repeating(
+                self._job_waha_health_check,
+                interval=300,   # 5 minutes
+                first=120,      # first check 2 minutes after startup
+            )
+            logger.info("WAHA health monitor active — checking every 5 minutes.")
+
         # Daily morning agenda — runs at morning_agenda_hour in owner's timezone
         if self._calendar_credentials:
             self.app.job_queue.run_daily(
@@ -805,6 +814,47 @@ class TelegramChannel:
 
         except Exception as e:
             logger.exception(f"Error in morning agenda job: {e}")
+
+    async def _job_waha_health_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Every 5 minutes: checks if WAHA / WhatsApp session is reachable.
+
+        Sends a Telegram notification when the session comes back online after
+        having been detected as down.  Avoids duplicate 'down' alerts — those
+        already arrive from WAHA's own notification system.
+        """
+        import requests as _req
+
+        try:
+            url  = f"{self._waha_url.rstrip('/')}/api/{self._waha_session}/me"
+            hdrs = {"X-Api-Key": self._waha_api_key} if self._waha_api_key else {}
+            resp = _req.get(url, headers=hdrs, timeout=8)
+            is_up = resp.status_code < 400
+        except Exception:
+            is_up = False
+
+        last_status = await self.memory.get_setting("waha_health", "unknown")
+
+        if last_status == "down" and is_up:
+            # Transition: down → up — notify owner
+            await self.memory.save_setting("waha_health", "up")
+            logger.info("[WAHA] Session back online — notifying owner.")
+            try:
+                await context.bot.send_message(
+                    chat_id=self._owner_chat_id,
+                    text="✅ WhatsApp (WAHA) está de vuelta en línea.",
+                )
+            except Exception as e:
+                logger.error(f"[WAHA] Could not send back-online notification: {e}")
+
+        elif last_status != "down" and not is_up:
+            # Transition: up/unknown → down — record silently (alert comes from WAHA)
+            await self.memory.save_setting("waha_health", "down")
+            logger.warning("[WAHA] Session appears to be down.")
+
+        elif last_status == "unknown":
+            # First check — just record the current state, no notification
+            await self.memory.save_setting("waha_health", "up" if is_up else "down")
+            logger.info(f"[WAHA] Initial health status recorded: {'up' if is_up else 'down'}.")
 
     async def _job_db_backup(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Daily job at 03:00 CDMX: sends SQLite database as a Telegram document backup."""
