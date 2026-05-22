@@ -544,8 +544,14 @@ async def read_chat_history(
                     logger.warning("[Telegram] transcriber module not available")
 
             # Collect all raw messages first (fast — no media processing yet)
-            # raw_msgs[0] = newest, raw_msgs[-1] = oldest  (Telethon default order)
             raw_msgs = [msg async for msg in client.iter_messages(entity, limit=limit)]
+
+            # Sort by actual message date (oldest first).
+            # Telethon's default order is by message ID descending, but message IDs
+            # reflect server-receive order which can diverge from client-send timestamp
+            # when messages are delayed (e.g. sent offline).  Sorting by msg.date gives
+            # the same order the user sees in the Telegram app.
+            raw_msgs.sort(key=lambda m: m.date)
 
             # Process all messages concurrently (downloads + Vision/Whisper in parallel)
             results = await asyncio.gather(*[
@@ -553,13 +559,10 @@ async def read_chat_history(
                 for msg in raw_msgs
             ])
 
-            # Pair each raw message with its processed string, keeping alignment.
-            # raw_msgs and results are both newest-first; zip then reverse → oldest-first.
-            raw_reversed = list(reversed(raw_msgs))
-            res_reversed = list(reversed(results))
+            # raw_msgs and results are now both oldest-first; just zip and filter Nones.
             valid_pairs: list[tuple] = [
                 (raw, res)
-                for raw, res in zip(raw_reversed, res_reversed)
+                for raw, res in zip(raw_msgs, results)
                 if res is not None
             ]
 
