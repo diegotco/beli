@@ -19,6 +19,7 @@ Public tools (called by executor.py):
 import datetime
 import json
 import logging
+import zoneinfo
 from pathlib import Path
 
 from telethon import TelegramClient
@@ -343,7 +344,7 @@ async def send_as_owner(
 
 # ── Tool 3: Read recent chats (overview) ─────────────────────────────────────
 
-async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str:
+async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5, timezone: str = "America/Mexico_City") -> str:
     """
     Reads the owner's most recent Telegram conversations, including all folders.
     Returns a summary with sender, last message preview, unread count, and timestamp.
@@ -389,7 +390,11 @@ async def read_telegram_chats(api_id: int, api_hash: str, limit: int = 5) -> str
                     preview = msg.text[:80] + ("…" if len(msg.text) > 80 else "")
                     sender  = "Tú" if msg.out else name.split("(")[0].strip()
                     unread  = f" [{dialog.unread_count} sin leer]" if dialog.unread_count else ""
-                    ts      = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+                    try:
+                        tz_info = zoneinfo.ZoneInfo(timezone)
+                    except Exception:
+                        tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
+                    ts      = msg.date.astimezone(tz_info).strftime("%d/%m/%Y %H:%M") if msg.date else ""
                     lines.append(f"{i}. {name}{unread} — {ts}\n   {sender}: {preview}")
                 else:
                     lines.append(f"{i}. {name} — (sin mensajes de texto)")
@@ -431,6 +436,7 @@ async def _process_single_message(
     transcriber,
     groq_api_key: str,
     anthropic_api_key: str,
+    timezone: str = "America/Mexico_City",
 ) -> str | None:
     """
     Processes one Telegram message into a formatted string.
@@ -438,7 +444,11 @@ async def _process_single_message(
     All media operations (download + Vision/Whisper) happen here so they
     can be run concurrently via asyncio.gather.
     """
-    ts = msg.date.astimezone().strftime("%d %b %H:%M") if msg.date else ""
+    try:
+        tz_info = zoneinfo.ZoneInfo(timezone)
+    except Exception:
+        tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
+    ts = msg.date.astimezone(tz_info).strftime("%d/%m/%Y %H:%M") if msg.date else ""
 
     if msg.out:
         sender = "Tú"
@@ -504,6 +514,7 @@ async def read_chat_history(
     limit: int = 30,
     groq_api_key: str = "",
     anthropic_api_key: str = "",
+    timezone: str = "America/Mexico_City",
 ) -> str:
     """
     Reads the recent message history of a specific Telegram chat by name.
@@ -537,7 +548,7 @@ async def read_chat_history(
 
             # Process all messages concurrently (downloads + Vision/Whisper in parallel)
             results = await asyncio.gather(*[
-                _process_single_message(client, msg, entity, transcriber, groq_api_key, anthropic_api_key)
+                _process_single_message(client, msg, entity, transcriber, groq_api_key, anthropic_api_key, timezone)
                 for msg in raw_msgs
             ])
 

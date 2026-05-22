@@ -344,16 +344,24 @@ async def read_whatsapp_chat_history(
                     sender = phone_or_name.split()[0]
 
             # ── Timestamp ────────────────────────────────────────────────────
-            ts = msg.get("_data", {}).get("t") or msg.get("timestamp") or 0
-            if ts:
+            ts_raw = msg.get("_data", {}).get("t") or msg.get("timestamp") or 0
+            dt = ""
+            if ts_raw:
                 try:
-                    if ts > 9_999_999_999:
-                        ts = ts // 1000
-                    dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d/%m/%Y %H:%M")
+                    # Handle both integer Unix timestamps and ISO 8601 strings
+                    if isinstance(ts_raw, str):
+                        # e.g. "2026-05-20T17:49:00.000Z" — parse as UTC then convert
+                        import re as _re2
+                        clean = _re2.sub(r'\.\d+', '', ts_raw).replace("Z", "+00:00")
+                        ts_dt = datetime.datetime.fromisoformat(clean).astimezone(tz_info)
+                        dt = ts_dt.strftime("%d/%m/%Y %H:%M")
+                    else:
+                        ts = int(ts_raw)
+                        if ts > 9_999_999_999:
+                            ts = ts // 1000
+                        dt = datetime.datetime.fromtimestamp(ts, tz=tz_info).strftime("%d/%m/%Y %H:%M")
                 except Exception:
                     dt = ""
-            else:
-                dt = ""
 
             # ── Media type detection ─────────────────────────────────────────
             nested_type    = msg.get("_data", {}).get("type", "")

@@ -113,6 +113,7 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
         )
 
     if tool_name == "read_chat_history":
+        tz = await _get_timezone()
         return await read_chat_history(
             api_id=config.TELEGRAM_API_ID,
             api_hash=config.TELEGRAM_API_HASH,
@@ -120,13 +121,16 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             limit=tool_input.get("limit", 30),
             groq_api_key=config.GROQ_API_KEY,
             anthropic_api_key=config.ANTHROPIC_API_KEY,
+            timezone=tz,
         )
 
     if tool_name == "read_telegram_chats":
+        tz = await _get_timezone()
         return await read_telegram_chats(
             api_id=config.TELEGRAM_API_ID,
             api_hash=config.TELEGRAM_API_HASH,
             limit=tool_input.get("limit", 5),
+            timezone=tz,
         )
 
     if tool_name == "set_timezone":
