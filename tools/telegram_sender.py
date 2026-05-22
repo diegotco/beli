@@ -544,6 +544,7 @@ async def read_chat_history(
                     logger.warning("[Telegram] transcriber module not available")
 
             # Collect all raw messages first (fast — no media processing yet)
+            # raw_msgs[0] = newest, raw_msgs[-1] = oldest  (Telethon default order)
             raw_msgs = [msg async for msg in client.iter_messages(entity, limit=limit)]
 
             # Process all messages concurrently (downloads + Vision/Whisper in parallel)
@@ -552,43 +553,64 @@ async def read_chat_history(
                 for msg in raw_msgs
             ])
 
-            # Filter out skipped service messages and reverse to chronological order
-            messages = [r for r in reversed(results) if r is not None]
+            # Pair each raw message with its processed string, keeping alignment.
+            # raw_msgs and results are both newest-first; zip then reverse → oldest-first.
+            raw_reversed = list(reversed(raw_msgs))
+            res_reversed = list(reversed(results))
+            valid_pairs: list[tuple] = [
+                (raw, res)
+                for raw, res in zip(raw_reversed, res_reversed)
+                if res is not None
+            ]
 
-            if not messages:
+            if not valid_pairs:
                 return f"No encontré mensajes en la conversación con '{chat_name}'."
 
+            messages = [res for _, res in valid_pairs]
             total = len(messages)
 
-            # ── Pre-compute last-3 per sender (put at the TOP so Claude reads it first) ──
+            # ── Sender labels from Telethon objects (reliable — no string parsing) ──────
+            def _raw_sender(raw_msg) -> str:
+                if raw_msg.out:
+                    return "Tú"
+                if isinstance(entity, User):
+                    return (entity.first_name or "Contacto").strip()
+                if raw_msg.sender:
+                    return (getattr(raw_msg.sender, "first_name", "") or "Miembro").strip()
+                return "Miembro"
+
+            senders = [_raw_sender(raw) for raw, _ in valid_pairs]
+
+            # ── Pre-compute last-3 per sender → put at TOP so Claude reads it first ─────
             from collections import defaultdict
             sender_msgs: dict[str, list[tuple[int, str]]] = defaultdict(list)
-            for i, msg in enumerate(messages, 1):
-                if "] " in msg:
-                    rest = msg.split("] ", 1)[1]
-                    if ": " in rest:
-                        sender_name = rest.split(": ", 1)[0]
-                        sender_msgs[sender_name].append((i, msg))
+            for i, (sender, msg) in enumerate(zip(senders, messages), 1):
+                sender_msgs[sender].append((i, msg))
+
+            logger.info(
+                f"[Telegram] read_chat_history '{chat_name}': {total} msgs. "
+                + " | ".join(f"{s}: {len(v)} msgs (last idx #{v[-1][0]})" for s, v in sender_msgs.items())
+            )
 
             summary_parts = [
-                "╔══ ÚLTIMOS MENSAJES POR REMITENTE ══╗",
-                "(Usa esta sección para responder preguntas sobre los últimos N mensajes de alguien.)",
+                "=== ULTIMOS MENSAJES POR REMITENTE ===",
+                "(Usa esta seccion para responder preguntas sobre los ultimos N mensajes de alguien.)",
             ]
             for sender, msgs in sorted(sender_msgs.items()):
                 last3 = msgs[-3:]
                 summary_parts.append(
-                    f"\n{sender} — últimos {min(3, len(msgs))} de {len(msgs)} mensajes (el más reciente al final):"
+                    f"\n{sender} — ultimos {min(3, len(msgs))} de {len(msgs)} mensajes (el mas reciente al final):"
                 )
                 for num, m in last3:
                     summary_parts.append(f"  [#{num}/{total}] {m}")
-            summary_parts.append("╚══════════════════════════════════╝\n")
+            summary_parts.append("======================================\n")
             summary_str = "\n".join(summary_parts) + "\n"
 
             # ── Numbered full history ─────────────────────────────────────────────────
             header = (
                 f"Historial completo del chat de Telegram con '{chat_name}' — "
-                f"{total} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero = #1, el más reciente al final = #{total}).\n"
-                f"Cada línea: [#N/{total}] [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
+                f"{total} mensajes ORDEN CRONOLOGICO (el mas antiguo = #1, el mas reciente = #{total}).\n"
+                f"Cada linea: [#N/{total}] [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
             )
             numbered = [f"[#{i}/{total}] {msg}" for i, msg in enumerate(messages, 1)]
 
