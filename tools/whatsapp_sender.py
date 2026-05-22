@@ -438,11 +438,12 @@ async def read_whatsapp_chat_history(
 
         today_str = datetime.date.today().strftime("%d/%m/%Y")
         header = (
-            f"Historial del chat con '{phone_or_name}' — "
-            f"hoy es {today_str} (usa esta fecha para distinguir mensajes de hoy vs ayer).\n"
-            f"Cada mensaje incluye [dd/mm/yyyy HH:MM]. Filtra por fecha cuando el owner pida mensajes de un día específico.\n"
+            f"Historial del chat de WhatsApp con '{phone_or_name}' — "
+            f"hoy es {today_str}. {len(lines)} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero, el más reciente al final).\n"
+            f"Cada línea: [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
+            f"IMPORTANTE: para encontrar los N mensajes más recientes de una persona, lee desde el FINAL de la lista hacia arriba.\n"
         )
-        return header + f"Últimos {len(lines)} mensajes:\n\n" + "\n".join(lines)
+        return header + "\n".join(lines)
 
     except Exception as e:
         logger.exception(f"[WhatsApp] Error reading history for {chat_id}: {e}")

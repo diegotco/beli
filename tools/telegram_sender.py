@@ -558,7 +558,13 @@ async def read_chat_history(
             if not messages:
                 return f"No encontré mensajes en la conversación con '{chat_name}'."
 
-            return f"Últimos {len(messages)} mensajes de '{chat_name}':\n\n" + "\n".join(messages)
+            header = (
+                f"Historial del chat de Telegram con '{chat_name}' — "
+                f"{len(messages)} mensajes en ORDEN CRONOLÓGICO (el más antiguo primero, el más reciente al final).\n"
+                f"Cada línea: [dd/mm/YYYY HH:MM] Remitente: mensaje\n"
+                f"IMPORTANTE: para encontrar los N mensajes más recientes de una persona, lee desde el FINAL de la lista hacia arriba.\n"
+            )
+            return header + "\n".join(messages)
 
     except Exception as e:
         logger.exception(f"Error reading chat history for '{chat_name}': {e}")

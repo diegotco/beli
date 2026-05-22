@@ -45,7 +45,9 @@ TOOLS = [
         "description": (
             "Reads the recent message history of a specific Telegram chat or contact. "
             "Use this when the owner asks to summarize, review, or search messages inside a specific conversation. "
-            "Search by the contact or group name."
+            "Search by the contact or group name. "
+            "Messages are returned in CHRONOLOGICAL ORDER (oldest first, newest last). "
+            "To find the N most recent messages from a specific person, read from the END of the list upward."
         ),
         "input_schema": {
             "type": "object",
@@ -56,7 +58,7 @@ TOOLS = [
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Number of recent messages to fetch (default 30, max 100).",
+                    "description": "Number of recent messages to fetch (default 50, max 100). Use higher values when filtering by a specific sender.",
                 },
             },
             "required": ["chat_name"],
