@@ -622,3 +622,106 @@ async def read_chat_history(
     except Exception as e:
         logger.exception(f"Error reading chat history for '{chat_name}': {e}")
         return f"Error al leer el historial de '{chat_name}': {e}"
+
+
+# ── Tool 5: Edit a sent Telegram message ──────────────────────────────────────
+
+async def edit_telegram_message(
+    api_id: int,
+    api_hash: str,
+    chat_name: str,
+    message_text: str,
+    new_text: str,
+) -> str:
+    """
+    Edits the most recent sent message (fromMe) in a Telegram chat that matches
+    message_text (case-insensitive substring).  Only the owner's own messages
+    can be edited.
+
+    Args:
+        api_id, api_hash: Telethon credentials
+        chat_name:        Contact or group name
+        message_text:     Snippet of the message to find (searches owner's sent msgs)
+        new_text:         Replacement text
+    """
+    try:
+        async with _owner_client(api_id, api_hash) as client:
+            _, entity = await _resolve_entity(client, chat_name)
+            if entity is None:
+                return f"No encontré ninguna conversación llamada '{chat_name}'."
+
+            # Search the owner's outgoing messages for the snippet
+            matches = []
+            async for msg in client.iter_messages(entity, limit=50, from_user="me"):
+                if msg.text and message_text.lower() in msg.text.lower():
+                    matches.append(msg)
+
+            if not matches:
+                return f"No encontré ningún mensaje tuyo que contenga '{message_text}' en la conversación con {chat_name}."
+
+            if len(matches) > 1:
+                previews = "\n".join(f"- \"{m.text[:80]}\"" for m in matches[:5])
+                return (
+                    f"Encontré {len(matches)} mensajes tuyos con '{message_text}':\n{previews}\n"
+                    "Sé más específico para que pueda editar el correcto."
+                )
+
+            target = matches[0]
+            await client.edit_message(entity, target.id, new_text)
+            logger.info(f"[Telegram] Edited message {target.id} in '{chat_name}'")
+            return f"Mensaje editado en {chat_name}. Nuevo texto: \"{new_text}\""
+
+    except Exception as e:
+        logger.exception(f"[Telegram] Error editing message in '{chat_name}': {e}")
+        return f"Error al editar el mensaje: {e}"
+
+
+# ── Tool 6: Delete a sent Telegram message ────────────────────────────────────
+
+async def delete_telegram_message(
+    api_id: int,
+    api_hash: str,
+    chat_name: str,
+    message_text: str,
+    revoke: bool = True,
+) -> str:
+    """
+    Deletes the most recent sent message (fromMe) in a Telegram chat that matches
+    message_text.  revoke=True deletes for everyone; False deletes only locally.
+
+    Args:
+        api_id, api_hash: Telethon credentials
+        chat_name:        Contact or group name
+        message_text:     Snippet of the message to find
+        revoke:           True = delete for everyone (default), False = delete only for me
+    """
+    try:
+        async with _owner_client(api_id, api_hash) as client:
+            _, entity = await _resolve_entity(client, chat_name)
+            if entity is None:
+                return f"No encontré ninguna conversación llamada '{chat_name}'."
+
+            matches = []
+            async for msg in client.iter_messages(entity, limit=50, from_user="me"):
+                if msg.text and message_text.lower() in msg.text.lower():
+                    matches.append(msg)
+
+            if not matches:
+                return f"No encontré ningún mensaje tuyo que contenga '{message_text}' en la conversación con {chat_name}."
+
+            if len(matches) > 1:
+                previews = "\n".join(f"- \"{m.text[:80]}\"" for m in matches[:5])
+                return (
+                    f"Encontré {len(matches)} mensajes tuyos con '{message_text}':\n{previews}\n"
+                    "Sé más específico para que pueda borrar el correcto."
+                )
+
+            target = matches[0]
+            await client.delete_messages(entity, [target.id], revoke=revoke)
+            scope = "para todos" if revoke else "solo para ti"
+            logger.info(f"[Telegram] Deleted message {target.id} in '{chat_name}' (revoke={revoke})")
+            return f"Mensaje eliminado {scope} en {chat_name}. Texto eliminado: \"{target.text[:80]}\""
+
+    except Exception as e:
+        logger.exception(f"[Telegram] Error deleting message in '{chat_name}': {e}")
+        return f"Error al eliminar el mensaje: {e}"

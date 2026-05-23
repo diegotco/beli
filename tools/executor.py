@@ -5,8 +5,8 @@ import asyncio
 import logging
 from functools import partial
 from config import config
-from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history
-from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history
+from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history, edit_telegram_message, delete_telegram_message
+from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history, edit_whatsapp_message, delete_whatsapp_message
 from tools.email_sender import send_email
 from tools.calendar_tool import read_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event
 from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
@@ -131,6 +131,44 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             api_hash=config.TELEGRAM_API_HASH,
             limit=tool_input.get("limit", 5),
             timezone=tz,
+        )
+
+    if tool_name == "edit_telegram_message":
+        return await edit_telegram_message(
+            api_id=config.TELEGRAM_API_ID,
+            api_hash=config.TELEGRAM_API_HASH,
+            chat_name=tool_input.get("chat_name", ""),
+            message_text=tool_input.get("message_text", ""),
+            new_text=tool_input.get("new_text", ""),
+        )
+
+    if tool_name == "delete_telegram_message":
+        return await delete_telegram_message(
+            api_id=config.TELEGRAM_API_ID,
+            api_hash=config.TELEGRAM_API_HASH,
+            chat_name=tool_input.get("chat_name", ""),
+            message_text=tool_input.get("message_text", ""),
+            revoke=tool_input.get("revoke", True),
+        )
+
+    if tool_name == "edit_whatsapp_message":
+        return edit_whatsapp_message(
+            waha_url=config.WAHA_URL,
+            phone_or_name=tool_input.get("phone_or_name", ""),
+            message_text=tool_input.get("message_text", ""),
+            new_text=tool_input.get("new_text", ""),
+            session=config.WAHA_SESSION,
+            api_key=config.WAHA_API_KEY,
+        )
+
+    if tool_name == "delete_whatsapp_message":
+        return delete_whatsapp_message(
+            waha_url=config.WAHA_URL,
+            phone_or_name=tool_input.get("phone_or_name", ""),
+            message_text=tool_input.get("message_text", ""),
+            delete_for_everyone=tool_input.get("delete_for_everyone", True),
+            session=config.WAHA_SESSION,
+            api_key=config.WAHA_API_KEY,
         )
 
     if tool_name == "set_timezone":

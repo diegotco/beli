@@ -479,3 +479,172 @@ async def read_whatsapp_chat_history(
     except Exception as e:
         logger.exception(f"[WhatsApp] Error reading history for {chat_id}: {e}")
         return f"Error al leer el historial de WhatsApp: {e}"
+
+
+# ── Tool 4: Edit a sent WhatsApp message ──────────────────────────────────────
+
+def edit_whatsapp_message(
+    waha_url: str,
+    phone_or_name: str,
+    message_text: str,
+    new_text: str,
+    session: str = _DEFAULT_SESSION,
+    api_key: str = "",
+) -> str:
+    """
+    Edits the most recent outgoing WhatsApp message that matches message_text.
+
+    Args:
+        waha_url:     Base URL of the WAHA service
+        phone_or_name: Contact name or phone number identifying the chat
+        message_text: Snippet of the sent message to find and edit
+        new_text:     New text to replace it with
+        session:      WAHA session name
+        api_key:      WAHA API key
+    """
+    chat_id, display_label = _resolve_chat_id(waha_url, phone_or_name, session, api_key)
+    if chat_id is None:
+        return f"Error: {display_label}"
+
+    # Fetch recent messages to locate the one to edit
+    try:
+        resp = requests.get(
+            f"{waha_url.rstrip('/')}/api/{session}/chats/{chat_id}/messages",
+            params={"limit": 50},
+            headers=_headers(api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        messages = resp.json()
+    except Exception as e:
+        return f"Error al obtener mensajes para editar: {e}"
+
+    # Find outgoing messages matching the snippet (most recent first — list order)
+    snippet_lower = message_text.lower()
+    candidates = [
+        m for m in messages
+        if m.get("fromMe") and (m.get("body") or m.get("caption") or "").lower().find(snippet_lower) != -1
+    ]
+
+    if not candidates:
+        return f"No encontré ningún mensaje tuyo que contenga '{message_text}' en el chat con {display_label}."
+
+    if len(candidates) > 1:
+        previews = "\n".join(f"- \"{(m.get('body') or m.get('caption') or '')[:80]}\"" for m in candidates[:5])
+        return (
+            f"Encontré {len(candidates)} mensajes tuyos con '{message_text}':\n{previews}\n"
+            "Sé más específico para que pueda editar el correcto."
+        )
+
+    target = candidates[0]
+    msg_id = target.get("id", "")
+    if not msg_id:
+        return "No se pudo obtener el ID del mensaje para editarlo."
+
+    try:
+        from urllib.parse import quote
+        encoded_id = quote(msg_id, safe="")
+        edit_resp = requests.put(
+            f"{waha_url.rstrip('/')}/api/{session}/chats/{chat_id}/messages/{encoded_id}",
+            json={"text": new_text},
+            headers=_headers(api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        edit_resp.raise_for_status()
+        logger.info(f"[WhatsApp] Edited message {msg_id} in '{display_label}'")
+        return f"Mensaje editado en {display_label}. Nuevo texto: \"{new_text}\""
+    except requests.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.response.json().get("message", e.response.text)
+        except Exception:
+            detail = str(e)
+        return f"Error al editar el mensaje de WhatsApp: {detail}"
+    except Exception as e:
+        logger.exception(f"[WhatsApp] Error editing message in '{display_label}': {e}")
+        return f"Error al editar el mensaje de WhatsApp: {e}"
+
+
+# ── Tool 5: Delete a sent WhatsApp message ────────────────────────────────────
+
+def delete_whatsapp_message(
+    waha_url: str,
+    phone_or_name: str,
+    message_text: str,
+    delete_for_everyone: bool = True,
+    session: str = _DEFAULT_SESSION,
+    api_key: str = "",
+) -> str:
+    """
+    Deletes the most recent outgoing WhatsApp message that matches message_text.
+
+    Args:
+        waha_url:            Base URL of the WAHA service
+        phone_or_name:       Contact name or phone number identifying the chat
+        message_text:        Snippet of the sent message to find and delete
+        delete_for_everyone: True = delete for everyone (default), False = delete only locally
+        session:             WAHA session name
+        api_key:             WAHA API key
+    """
+    chat_id, display_label = _resolve_chat_id(waha_url, phone_or_name, session, api_key)
+    if chat_id is None:
+        return f"Error: {display_label}"
+
+    # Fetch recent messages
+    try:
+        resp = requests.get(
+            f"{waha_url.rstrip('/')}/api/{session}/chats/{chat_id}/messages",
+            params={"limit": 50},
+            headers=_headers(api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        messages = resp.json()
+    except Exception as e:
+        return f"Error al obtener mensajes para eliminar: {e}"
+
+    snippet_lower = message_text.lower()
+    candidates = [
+        m for m in messages
+        if m.get("fromMe") and (m.get("body") or m.get("caption") or "").lower().find(snippet_lower) != -1
+    ]
+
+    if not candidates:
+        return f"No encontré ningún mensaje tuyo que contenga '{message_text}' en el chat con {display_label}."
+
+    if len(candidates) > 1:
+        previews = "\n".join(f"- \"{(m.get('body') or m.get('caption') or '')[:80]}\"" for m in candidates[:5])
+        return (
+            f"Encontré {len(candidates)} mensajes tuyos con '{message_text}':\n{previews}\n"
+            "Sé más específico para que pueda borrar el correcto."
+        )
+
+    target = candidates[0]
+    msg_id = target.get("id", "")
+    original_text = (target.get("body") or target.get("caption") or "")[:80]
+    if not msg_id:
+        return "No se pudo obtener el ID del mensaje para eliminarlo."
+
+    try:
+        from urllib.parse import quote
+        encoded_id = quote(msg_id, safe="")
+        del_resp = requests.delete(
+            f"{waha_url.rstrip('/')}/api/{session}/chats/{chat_id}/messages/{encoded_id}",
+            params={"deleteForEveryone": "true" if delete_for_everyone else "false"},
+            headers=_headers(api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        del_resp.raise_for_status()
+        scope = "para todos" if delete_for_everyone else "solo para ti"
+        logger.info(f"[WhatsApp] Deleted message {msg_id} in '{display_label}' (for_everyone={delete_for_everyone})")
+        return f"Mensaje eliminado {scope} en {display_label}. Texto eliminado: \"{original_text}\""
+    except requests.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.response.json().get("message", e.response.text)
+        except Exception:
+            detail = str(e)
+        return f"Error al eliminar el mensaje de WhatsApp: {detail}"
+    except Exception as e:
+        logger.exception(f"[WhatsApp] Error deleting message in '{display_label}': {e}")
+        return f"Error al eliminar el mensaje de WhatsApp: {e}"

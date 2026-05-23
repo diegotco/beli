@@ -569,6 +569,114 @@ TOOLS = [
         },
     },
     {
+        "name": "edit_telegram_message",
+        "description": (
+            "Edits the most recent outgoing Telegram message in a chat that matches a text snippet. "
+            "Use when the owner asks to edit, fix, or change something they already sent on Telegram. "
+            "ALWAYS confirm what the new message will say before calling. "
+            "Only works on messages sent by the owner (fromMe)."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "chat_name": {
+                    "type": "string",
+                    "description": "Name of the contact or group where the message was sent.",
+                },
+                "message_text": {
+                    "type": "string",
+                    "description": "A snippet of the sent message to identify it (case-insensitive).",
+                },
+                "new_text": {
+                    "type": "string",
+                    "description": "The new text to replace the message with.",
+                },
+            },
+            "required": ["chat_name", "message_text", "new_text"],
+        },
+    },
+    {
+        "name": "delete_telegram_message",
+        "description": (
+            "Deletes the most recent outgoing Telegram message in a chat that matches a text snippet. "
+            "Use when the owner asks to delete, remove, or unsend a Telegram message they sent. "
+            "By default deletes for everyone (revoke=true). "
+            "ALWAYS confirm before calling — deletion is irreversible."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "chat_name": {
+                    "type": "string",
+                    "description": "Name of the contact or group where the message was sent.",
+                },
+                "message_text": {
+                    "type": "string",
+                    "description": "A snippet of the sent message to identify it (case-insensitive).",
+                },
+                "revoke": {
+                    "type": "boolean",
+                    "description": "True (default) = delete for everyone. False = delete only locally.",
+                },
+            },
+            "required": ["chat_name", "message_text"],
+        },
+    },
+    {
+        "name": "edit_whatsapp_message",
+        "description": (
+            "Edits the most recent outgoing WhatsApp message in a chat that matches a text snippet. "
+            "Use when the owner asks to edit, fix, or change a WhatsApp message they already sent. "
+            "ALWAYS confirm the new message text before calling. "
+            "Only works on messages sent by the owner."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phone_or_name": {
+                    "type": "string",
+                    "description": "Contact name or phone number of the chat where the message was sent.",
+                },
+                "message_text": {
+                    "type": "string",
+                    "description": "A snippet of the sent message to identify it (case-insensitive).",
+                },
+                "new_text": {
+                    "type": "string",
+                    "description": "The new text to replace the message with.",
+                },
+            },
+            "required": ["phone_or_name", "message_text", "new_text"],
+        },
+    },
+    {
+        "name": "delete_whatsapp_message",
+        "description": (
+            "Deletes the most recent outgoing WhatsApp message in a chat that matches a text snippet. "
+            "Use when the owner asks to delete, remove, or unsend a WhatsApp message they sent. "
+            "By default deletes for everyone. "
+            "ALWAYS confirm before calling — deletion is irreversible."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "phone_or_name": {
+                    "type": "string",
+                    "description": "Contact name or phone number of the chat where the message was sent.",
+                },
+                "message_text": {
+                    "type": "string",
+                    "description": "A snippet of the sent message to identify it (case-insensitive).",
+                },
+                "delete_for_everyone": {
+                    "type": "boolean",
+                    "description": "True (default) = delete for everyone. False = delete only locally.",
+                },
+            },
+            "required": ["phone_or_name", "message_text"],
+        },
+    },
+    {
         "name": "post_tweet",
         "description": (
             "Posts a tweet or native X poll on @DiegoCapital_99. "
