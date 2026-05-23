@@ -285,6 +285,68 @@ TOOLS = [
         },
     },
     {
+        "name": "delete_calendar_event",
+        "description": (
+            "Deletes an existing event from the owner's Google Calendar. "
+            "Use when the owner asks to cancel, remove, or delete a calendar event. "
+            "Searches by title (partial match). If multiple events match, returns a list and asks for the date to disambiguate. "
+            "Always confirm with the owner before calling — this action is irreversible."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_title": {
+                    "type": "string",
+                    "description": "Title (or partial title) of the event to delete.",
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Optional date filter 'YYYY-MM-DD' to narrow the search when multiple events share the same title.",
+                },
+            },
+            "required": ["event_title"],
+        },
+    },
+    {
+        "name": "update_calendar_event",
+        "description": (
+            "Updates an existing Google Calendar event — reschedule it, rename it, or change its description. "
+            "Use when the owner wants to move, edit, or modify an existing event. "
+            "Searches by current title (partial match). Pass only the fields you want to change. "
+            "Always confirm the changes with the owner before calling."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "event_title": {
+                    "type": "string",
+                    "description": "Current title (or partial title) of the event to find.",
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Optional 'YYYY-MM-DD' filter to disambiguate when multiple events share the same name.",
+                },
+                "new_start_datetime": {
+                    "type": "string",
+                    "description": "New start date/time in ISO 8601 format, e.g. '2026-05-23T09:00:00'. Omit if not changing.",
+                },
+                "new_end_datetime": {
+                    "type": "string",
+                    "description": "New end date/time in ISO 8601 format. Omit if not changing.",
+                },
+                "new_title": {
+                    "type": "string",
+                    "description": "New title for the event. Omit if not renaming.",
+                },
+                "new_description": {
+                    "type": "string",
+                    "description": "New description/notes. Omit if not changing.",
+                },
+            },
+            "required": ["event_title"],
+        },
+    },
+    {
         "name": "list_task_lists",
         "description": (
             "Returns all of the owner's Google Tasks lists with their IDs. "

@@ -8,7 +8,7 @@ from config import config
 from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history
 from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history
 from tools.email_sender import send_email
-from tools.calendar_tool import read_calendar_events, create_calendar_event
+from tools.calendar_tool import read_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event
 from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
 from tools.tasks_tool import (
     list_task_lists,
@@ -165,6 +165,26 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             end_datetime=tool_input.get("end_datetime", ""),
             description=tool_input.get("description", ""),
             location=tool_input.get("location", ""),
+            timezone=tz,
+        )
+
+    if tool_name == "delete_calendar_event":
+        return delete_calendar_event(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            event_title=tool_input.get("event_title", ""),
+            start_date=tool_input.get("start_date", ""),
+        )
+
+    if tool_name == "update_calendar_event":
+        tz = await _get_timezone()
+        return update_calendar_event(
+            credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+            event_title=tool_input.get("event_title", ""),
+            new_start_datetime=tool_input.get("new_start_datetime", ""),
+            new_end_datetime=tool_input.get("new_end_datetime", ""),
+            new_title=tool_input.get("new_title", ""),
+            new_description=tool_input.get("new_description", ""),
+            start_date=tool_input.get("start_date", ""),
             timezone=tz,
         )
 

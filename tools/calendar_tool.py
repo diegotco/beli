@@ -156,3 +156,148 @@ def create_calendar_event(
     except Exception as e:
         logger.exception(f"[Calendar] Error creating event: {e}")
         return f"Error al crear el evento: {e}"
+
+
+def delete_calendar_event(
+    credentials_json: str,
+    event_title: str,
+    start_date: str = "",
+) -> str:
+    """
+    Deletes a calendar event by title (and optionally by date to disambiguate).
+
+    Args:
+        credentials_json: JSON string with OAuth credentials
+        event_title:      Title of the event to delete (case-insensitive partial match)
+        start_date:       Optional date filter 'YYYY-MM-DD' to narrow search
+    """
+    if not credentials_json:
+        return "No están configuradas las credenciales de Google Calendar."
+
+    try:
+        service = _get_service(credentials_json)
+
+        # Search within a wide window (next 90 days + past 7 days)
+        from datetime import timezone as _tz
+        now     = datetime.now(tz=_tz.utc)
+        time_min = (now - timedelta(days=7)).isoformat()
+        time_max = (now + timedelta(days=90)).isoformat()
+
+        result = service.events().list(
+            calendarId="primary",
+            timeMin=time_min,
+            timeMax=time_max,
+            maxResults=50,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+
+        events = result.get("items", [])
+        title_lower = event_title.lower()
+
+        matches = [
+            ev for ev in events
+            if title_lower in ev.get("summary", "").lower()
+            and (not start_date or ev.get("start", {}).get("dateTime", ev.get("start", {}).get("date", "")).startswith(start_date))
+        ]
+
+        if not matches:
+            return f"No encontré ningún evento que contenga '{event_title}'" + (f" el {start_date}" if start_date else "") + "."
+
+        if len(matches) > 1:
+            lines = [f"- {ev.get('summary')} ({ev.get('start',{}).get('dateTime', ev.get('start',{}).get('date',''))[:16]})" for ev in matches]
+            return "Encontré varios eventos con ese nombre:\n" + "\n".join(lines) + "\nIndica la fecha exacta para eliminar el correcto."
+
+        ev = matches[0]
+        event_id = ev["id"]
+        ev_title = ev.get("summary", event_title)
+        ev_start = ev.get("start", {}).get("dateTime", ev.get("start", {}).get("date", ""))[:16]
+
+        service.events().delete(calendarId="primary", eventId=event_id).execute()
+        logger.info(f"[Calendar] Event deleted: {ev_title} ({ev_start})")
+        return f"Evento '{ev_title}' del {ev_start} eliminado correctamente."
+
+    except Exception as e:
+        logger.exception(f"[Calendar] Error deleting event: {e}")
+        return f"Error al eliminar el evento: {e}"
+
+
+def update_calendar_event(
+    credentials_json: str,
+    event_title: str,
+    new_start_datetime: str = "",
+    new_end_datetime: str = "",
+    new_title: str = "",
+    new_description: str = "",
+    start_date: str = "",
+    timezone: str = "America/Mexico_City",
+) -> str:
+    """
+    Updates an existing calendar event (reschedule, rename, or change description).
+
+    Args:
+        credentials_json:   JSON string with OAuth credentials
+        event_title:        Current title to find the event (partial, case-insensitive)
+        new_start_datetime: New start in ISO 8601 format (optional)
+        new_end_datetime:   New end in ISO 8601 format (optional)
+        new_title:          New title if renaming (optional)
+        new_description:    New description (optional)
+        start_date:         'YYYY-MM-DD' filter to disambiguate when multiple events match
+        timezone:           IANA timezone for the event times
+    """
+    if not credentials_json:
+        return "No están configuradas las credenciales de Google Calendar."
+
+    try:
+        service = _get_service(credentials_json)
+
+        from datetime import timezone as _tz
+        now      = datetime.now(tz=_tz.utc)
+        time_min = (now - timedelta(days=7)).isoformat()
+        time_max = (now + timedelta(days=90)).isoformat()
+
+        result = service.events().list(
+            calendarId="primary",
+            timeMin=time_min,
+            timeMax=time_max,
+            maxResults=50,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+
+        events = result.get("items", [])
+        title_lower = event_title.lower()
+
+        matches = [
+            ev for ev in events
+            if title_lower in ev.get("summary", "").lower()
+            and (not start_date or ev.get("start", {}).get("dateTime", ev.get("start", {}).get("date", "")).startswith(start_date))
+        ]
+
+        if not matches:
+            return f"No encontré ningún evento que contenga '{event_title}'" + (f" el {start_date}" if start_date else "") + "."
+
+        if len(matches) > 1:
+            lines = [f"- {ev.get('summary')} ({ev.get('start',{}).get('dateTime', ev.get('start',{}).get('date',''))[:16]})" for ev in matches]
+            return "Encontré varios eventos con ese nombre:\n" + "\n".join(lines) + "\nIndica la fecha exacta para actualizar el correcto."
+
+        ev = matches[0]
+        event_id = ev["id"]
+
+        if new_title:
+            ev["summary"] = new_title
+        if new_description:
+            ev["description"] = new_description
+        if new_start_datetime:
+            ev["start"] = {"dateTime": new_start_datetime, "timeZone": timezone}
+        if new_end_datetime:
+            ev["end"] = {"dateTime": new_end_datetime, "timeZone": timezone}
+
+        updated = service.events().update(calendarId="primary", eventId=event_id, body=ev).execute()
+        new_start = updated.get("start", {}).get("dateTime", updated.get("start", {}).get("date", ""))[:16]
+        logger.info(f"[Calendar] Event updated: {updated.get('summary')} → {new_start}")
+        return f"Evento '{updated.get('summary')}' actualizado. Nueva fecha/hora: {new_start}."
+
+    except Exception as e:
+        logger.exception(f"[Calendar] Error updating event: {e}")
+        return f"Error al actualizar el evento: {e}"
