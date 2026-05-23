@@ -220,14 +220,20 @@ OWNER_PROFILE = _load_profile()
 SYSTEM_PROMPT = CORE_IDENTITY + "\n\n" + OWNER_PROFILE if OWNER_PROFILE else CORE_IDENTITY
 
 
-def get_system_prompt(extra_context: str = "") -> str:
+def get_system_prompt(extra_context: str = "", timezone: str = "America/Mexico_City") -> str:
     """
     Returns Beli's full system prompt, always including the live contact cache
     so Beli knows exactly who is confirmed without needing to search or guess.
     Optionally enriched with extra context (e.g. recently extracted facts).
+    The timezone parameter ensures 'today' reflects the owner's local date,
+    not the UTC date on the Railway server.
     """
-    import datetime
-    today = datetime.date.today()
+    import datetime, zoneinfo
+    try:
+        tz_info = zoneinfo.ZoneInfo(timezone)
+    except Exception:
+        tz_info = zoneinfo.ZoneInfo("America/Mexico_City")
+    today = datetime.datetime.now(tz=tz_info).date()
     weekdays_es = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     months_es   = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
                    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]

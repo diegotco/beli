@@ -300,8 +300,8 @@ class TelegramChannel:
         history = await self.memory.get_history(CHANNEL, user_id)
         facts   = await self.memory.get_facts(CHANNEL, user_id)
         extra   = "\n".join(f"- {f}" for f in facts) if facts else ""
-        system  = get_system_prompt(extra)
         tz      = await self.memory.get_setting("timezone", "America/Mexico_City")
+        system  = get_system_prompt(extra, timezone=tz)
         import zoneinfo as _zi
         _now    = datetime.datetime.now(tz=_zi.ZoneInfo(tz)).strftime("%A %d %b %Y, %H:%M")
 
@@ -487,9 +487,10 @@ class TelegramChannel:
         history = await self.memory.get_history(CHANNEL, user_id)
         facts = await self.memory.get_facts(CHANNEL, user_id)
         extra_context = "\n".join(f"- {f}" for f in facts) if facts else ""
+        tz = await self.memory.get_setting("timezone", "America/Mexico_City")
 
         # Build system prompt enriched with user context
-        system = get_system_prompt(extra_context)
+        system = get_system_prompt(extra_context, timezone=tz)
 
         # Ask the brain (Claude) for a response
         response = await self.brain.think(
@@ -534,7 +535,8 @@ class TelegramChannel:
         history = await self.memory.get_history(CHANNEL, user_id)
         facts = await self.memory.get_facts(CHANNEL, user_id)
         extra_context = "\n".join(f"- {f}" for f in facts) if facts else ""
-        system = get_system_prompt(extra_context)
+        tz = await self.memory.get_setting("timezone", "America/Mexico_City")
+        system = get_system_prompt(extra_context, timezone=tz)
 
         # Ask Claude to read and respond to the image
         response = await self.brain.think_with_image(
@@ -593,7 +595,8 @@ class TelegramChannel:
         history = await self.memory.get_history(CHANNEL, user_id)
         facts = await self.memory.get_facts(CHANNEL, user_id)
         extra_context = "\n".join(f"- {f}" for f in facts) if facts else ""
-        system = get_system_prompt(extra_context)
+        tz = await self.memory.get_setting("timezone", "America/Mexico_City")
+        system = get_system_prompt(extra_context, timezone=tz)
 
         response = await self.brain.think(
             system_prompt=system,
