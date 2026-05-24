@@ -133,30 +133,6 @@ TOOLS = [
         },
     },
     {
-        "name": "send_whatsapp_image",
-        "description": (
-            "Sends an image via WhatsApp FROM the owner's personal number. "
-            "Use this when the owner sends a photo and asks you to forward it to someone on WhatsApp. "
-            "The image must have been sent by the owner in this conversation first — it is stored automatically. "
-            "ALWAYS show a confirmation (who you'll send it to, and caption if any) before calling. "
-            "Accepts phone number, WhatsApp chat ID, or contact/group name as recipient."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "recipient": {
-                    "type": "string",
-                    "description": "Phone number ('+525561103975'), WhatsApp chat ID, or contact/group name.",
-                },
-                "caption": {
-                    "type": "string",
-                    "description": "Optional text caption to include with the image.",
-                },
-            },
-            "required": ["recipient"],
-        },
-    },
-    {
         "name": "read_whatsapp_chats",
         "description": (
             "Reads the owner's most recent WhatsApp conversations. "
