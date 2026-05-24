@@ -6,7 +6,7 @@ import logging
 from functools import partial
 from config import config
 from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history, edit_telegram_message, delete_telegram_message
-from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history, edit_whatsapp_message, delete_whatsapp_message
+from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history, edit_whatsapp_message, delete_whatsapp_message, send_whatsapp_image
 from tools.email_sender import send_email
 from tools.calendar_tool import read_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event
 from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
@@ -33,6 +33,16 @@ def set_pending_video(video_bytes: bytes | None, filename: str = "video.mp4") ->
     global _pending_video, _pending_video_filename
     _pending_video = video_bytes
     _pending_video_filename = filename
+
+# Optional image bytes to forward via WhatsApp/etc (set by Telegram handler)
+_pending_image: bytes | None = None
+_pending_image_filename: str = "photo.jpg"
+
+def set_pending_image(image_bytes: bytes | None, filename: str = "photo.jpg") -> None:
+    """Called by the Telegram channel when the user sends a photo to be forwarded."""
+    global _pending_image, _pending_image_filename
+    _pending_image = image_bytes
+    _pending_image_filename = filename
 
 def set_memory(memory) -> None:
     """Called at startup so executor can read user preferences like timezone."""
@@ -149,6 +159,21 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             chat_name=tool_input.get("chat_name", ""),
             message_text=tool_input.get("message_text", ""),
             revoke=tool_input.get("revoke", True),
+        )
+
+    if tool_name == "send_whatsapp_image":
+        global _pending_image, _pending_image_filename
+        image = _pending_image
+        filename = _pending_image_filename
+        _pending_image = None  # consume once
+        return send_whatsapp_image(
+            waha_url=config.WAHA_URL,
+            recipient=tool_input.get("recipient", ""),
+            caption=tool_input.get("caption", ""),
+            image_bytes=image,
+            image_filename=filename,
+            session=config.WAHA_SESSION,
+            api_key=config.WAHA_API_KEY,
         )
 
     if tool_name == "edit_whatsapp_message":

@@ -529,7 +529,12 @@ class TelegramChannel:
         file = await context.bot.get_file(photo.file_id)
         buf = io.BytesIO()
         await file.download_to_memory(buf)
-        image_b64 = base64.b64encode(buf.getvalue()).decode()
+        image_bytes = buf.getvalue()
+        image_b64 = base64.b64encode(image_bytes).decode()
+
+        # Store bytes so Claude can forward the image (e.g. via send_whatsapp_image)
+        from tools.executor import set_pending_image
+        set_pending_image(image_bytes, f"photo_{photo.file_unique_id}.jpg")
 
         # Load context
         history = await self.memory.get_history(CHANNEL, user_id)

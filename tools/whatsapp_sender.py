@@ -481,7 +481,79 @@ async def read_whatsapp_chat_history(
         return f"Error al leer el historial de WhatsApp: {e}"
 
 
-# ── Tool 4: Edit a sent WhatsApp message ──────────────────────────────────────
+# ── Tool 4: Send WhatsApp image ───────────────────────────────────────────────
+
+def send_whatsapp_image(
+    waha_url: str,
+    recipient: str,
+    caption: str = "",
+    image_bytes: bytes | None = None,
+    image_filename: str = "photo.jpg",
+    session: str = _DEFAULT_SESSION,
+    api_key: str = "",
+) -> str:
+    """
+    Sends an image via WhatsApp FROM the owner's personal number.
+
+    Args:
+        waha_url:       Base URL of the WAHA service
+        recipient:      Phone number, chat ID, or contact/group name
+        caption:        Optional text caption to include with the image
+        image_bytes:    Raw image bytes (from the pending image set by Telegram handler)
+        image_filename: Filename hint (e.g. 'photo.jpg')
+        session:        WAHA session name
+        api_key:        WAHA API key
+    """
+    if not image_bytes:
+        return "No hay imagen pendiente para enviar. Envía la foto primero y luego pídeme que la mande."
+
+    chat_id, display_label = _resolve_chat_id(waha_url, recipient, session, api_key)
+    if chat_id is None:
+        return f"Error: {display_label}"
+
+    import base64
+    import mimetypes
+
+    mimetype = mimetypes.guess_type(image_filename)[0] or "image/jpeg"
+    image_b64 = base64.b64encode(image_bytes).decode()
+
+    payload = {
+        "session": session,
+        "chatId": chat_id,
+        "caption": caption,
+        "file": {
+            "mimetype": mimetype,
+            "filename": image_filename,
+            "data": image_b64,
+        },
+    }
+
+    logger.info(f"[WhatsApp] Sending image to {chat_id} ({len(image_bytes)} bytes, caption: '{caption[:60]}')")
+
+    try:
+        resp = requests.post(
+            f"{waha_url.rstrip('/')}/api/sendImage",
+            json=payload,
+            headers=_headers(api_key),
+            timeout=_REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        logger.info(f"[WhatsApp] Image sent successfully to {chat_id}")
+        return f"✓ Imagen enviada por WhatsApp a {display_label}." + (f" Caption: '{caption}'" if caption else "")
+    except requests.HTTPError as e:
+        detail = ""
+        try:
+            detail = e.response.json().get("message", e.response.text)
+        except Exception:
+            detail = str(e)
+        logger.error(f"[WhatsApp] HTTP error sending image to {chat_id}: {detail}")
+        return f"Error al enviar la imagen por WhatsApp: {detail}"
+    except Exception as e:
+        logger.exception(f"[WhatsApp] Error sending image to {chat_id}: {e}")
+        return f"Error al enviar la imagen por WhatsApp: {e}"
+
+
+# ── Tool 5: Edit a sent WhatsApp message ──────────────────────────────────────
 
 def edit_whatsapp_message(
     waha_url: str,
