@@ -127,7 +127,8 @@ def handle_payg0_webhook(
         lines = [f"{emoji} Payg0 — {label}"]
 
         if event == "payment.received":
-            sender = data.get("sender_id", data.get("sender", "?"))
+            nickname = data.get("sender_nickname", "")
+            sender   = f"@{nickname}" if nickname else data.get("sender_id", "?")
             lines.append(f"De: {sender}")
             lines.append(f"Monto: ${amount} MXN")
         elif event == "payment.completed":
@@ -144,8 +145,6 @@ def handle_payg0_webhook(
 
         if desc:
             lines.append(f"Descripción: {desc}")
-        if tx_id:
-            lines.append(f"ID: {tx_id}")
 
         _send_telegram(bot_token, owner_chat_id, "\n".join(lines))
 
@@ -202,8 +201,7 @@ def register_payg0_webhook(api_key: str, webhook_url: str) -> str:
     If webhook already exists (409), attempts rotate-secret to get a fresh secret.
     """
     _HEADERS = {"X-API-Key": api_key, "Content-Type": "application/json"}
-    _EVENTS  = ["payment.received", "payment.completed", "payment.pending",
-                "payment.failed", "payment.cancelled", "payment.expired"]
+    _EVENTS  = ["payment.received"]
     try:
         resp = requests.post(
             "https://api.payg0.io/api/v1/webhooks",
