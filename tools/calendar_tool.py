@@ -212,7 +212,24 @@ def create_calendar_event(
         created = service.events().insert(calendarId="primary", body=event_body).execute()
         link = created.get("htmlLink", "")
         logger.info(f"[Calendar] Event created: {title} ({start_datetime})")
-        return f"Evento '{title}' creado el {start_datetime[:10]} a las {start_datetime[11:16]}." + (f" Ver: {link}" if link else "")
+
+        # Compute the day-of-week in Spanish using Python (reliable — never guess)
+        _WEEKDAYS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+        _MONTHS_ES   = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
+                        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+        try:
+            from datetime import datetime as _dt
+            d = _dt.fromisoformat(start_datetime)
+            day_name  = _WEEKDAYS_ES[d.weekday()]
+            month_name = _MONTHS_ES[d.month - 1]
+            date_str  = f"{day_name} {d.day} de {month_name} de {d.year} a las {d.strftime('%H:%M')}"
+        except Exception:
+            date_str = f"{start_datetime[:10]} a las {start_datetime[11:16]}"
+
+        result = f"✓ Evento '{title}' creado para el {date_str}."
+        if link:
+            result += f" Ver: {link}"
+        return result
 
     except Exception as e:
         logger.exception(f"[Calendar] Error creating event: {e}")
