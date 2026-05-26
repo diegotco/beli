@@ -68,6 +68,8 @@ class TelegramChannel:
         x_bearer_token: str = "",
         x_access_token: str = "",
         x_access_token_secret: str = "",
+        # Payg0
+        payg0_api_key: str = "",
     ):
         self.token = token
         self.brain = brain
@@ -101,6 +103,13 @@ class TelegramChannel:
         self._x_bearer_token        = x_bearer_token
         self._x_access_token        = x_access_token
         self._x_access_token_secret = x_access_token_secret
+
+        # Payg0 config
+        self._payg0_api_key         = payg0_api_key
+
+        # In-memory sets to avoid duplicate reminder notifications
+        self._notified_event_ids:   set[str] = set()  # "event_id:YYYY-MM-DD"
+        self._notified_pending_ids: set[str] = set()  # Payg0 payment UUIDs
 
         self.app = Application.builder().token(token).post_init(self._post_init).build()
         self._register_handlers()
@@ -180,6 +189,24 @@ class TelegramChannel:
                 ),
             )
             logger.info("DB backup job active — runs daily at 03:00 CDMX.")
+
+        # Event reminders — every 10 minutes, alerts 15-45 min before events
+        if self._calendar_credentials and self._owner_chat_id:
+            self.app.job_queue.run_repeating(
+                self._job_event_reminder,
+                interval=600,   # 10 minutes
+                first=90,
+            )
+            logger.info("Event reminder job active — checking every 10 minutes.")
+
+        # Payg0 pending payments check — every 4 hours
+        if self._payg0_api_key and self._owner_chat_id:
+            self.app.job_queue.run_repeating(
+                self._job_payg0_pending_check,
+                interval=14400,  # 4 hours
+                first=120,
+            )
+            logger.info("Payg0 pending check active — polling every 4 hours.")
 
         # Text messages
         self.app.add_handler(
@@ -369,6 +396,8 @@ class TelegramChannel:
         category_keys = {
             "messaging": ["whatsapp_direct", "whatsapp_groups", "telegram_direct", "telegram_groups"],
             "x":         ["x_mentions", "x_likes", "x_dms"],
+            "agenda":    ["calendar_reminders", "event_reminders"],
+            "payments":  ["payg0_pending_reminders"],
         }
         keys = category_keys.get(page, [])
         any_on = any(s.is_enabled(k) for k in keys)
@@ -395,16 +424,24 @@ class TelegramChannel:
                 [InlineKeyboardButton("← Volver", callback_data="notif:page:main")],
             ])
 
+        if page == "agenda":
+            return InlineKeyboardMarkup([
+                [t("calendar_reminders", "📅 Agenda matutina")],
+                [t("event_reminders",    "⏰ Recordatorio 30 min antes")],
+                [InlineKeyboardButton("← Volver", callback_data="notif:page:main")],
+            ])
+
+        if page == "payments":
+            return InlineKeyboardMarkup([
+                [t("payg0_pending_reminders", "💸 Pagos pendientes (Payg0)")],
+                [InlineKeyboardButton("← Volver", callback_data="notif:page:main")],
+            ])
+
         # Main menu
         c = self._notif_category_label
-        from settings.notifications import get_settings
-        cal_icon = "🟢" if get_settings().is_enabled("calendar_reminders") else "⚪"
         return InlineKeyboardMarkup([
             [c("messaging", "💬 Mensajería"), c("x", "𝕏 X")],
-            [InlineKeyboardButton(
-                f"{cal_icon} 📅 Calendario",
-                callback_data="notif:toggle:calendar_reminders"
-            )],
+            [c("agenda",    "📅 Agenda"),     c("payments", "💸 Pagos")],
             [InlineKeyboardButton("✖ Cerrar", callback_data="notif:close")],
         ])
 
@@ -822,6 +859,109 @@ class TelegramChannel:
 
         except Exception as e:
             logger.exception(f"Error in morning agenda job: {e}")
+
+    async def _job_event_reminder(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Every 10 min: sends a reminder for timed events starting in 15-45 minutes."""
+        from settings.notifications import get_settings
+        if not get_settings().is_enabled("event_reminders"):
+            return
+
+        chat_id = self._owner_chat_id
+        if not chat_id:
+            return
+
+        try:
+            import datetime, zoneinfo
+            from tools.calendar_tool import get_upcoming_events_structured
+
+            tz     = await self.memory.get_setting("timezone", "America/Mexico_City")
+            events = get_upcoming_events_structured(
+                credentials_json=self._calendar_credentials,
+                minutes_ahead=50,   # look up to 50 min ahead
+                timezone=tz,
+            )
+            now    = datetime.datetime.now(zoneinfo.ZoneInfo(tz))
+            today  = now.date().isoformat()
+
+            for ev in events:
+                minutes_away = int((ev["start"] - now).total_seconds() / 60)
+                if not (10 <= minutes_away <= 45):
+                    continue  # outside the reminder window
+
+                key = f"{ev['id']}:{today}"
+                if key in self._notified_event_ids:
+                    continue  # already notified today
+
+                self._notified_event_ids.add(key)
+
+                start_str = ev["start"].strftime("%H:%M")
+                end_str   = ev["end"].strftime("%H:%M")
+                lines = [f"📅 En {minutes_away} min: {ev['title']} ({start_str} – {end_str})"]
+                if ev["location"]:
+                    lines.append(f"📍 {ev['location']}")
+
+                await context.bot.send_message(chat_id=chat_id, text="\n".join(lines))
+                logger.info(f"[EventReminder] Sent reminder for '{ev['title']}' in {minutes_away} min.")
+
+            # Prune old keys to avoid unbounded growth (keep only today's)
+            self._notified_event_ids = {
+                k for k in self._notified_event_ids if k.endswith(today)
+            }
+
+        except Exception as e:
+            logger.exception(f"Error in event reminder job: {e}")
+
+    async def _job_payg0_pending_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Every 4 hours: notifies about outgoing Payg0 payments still unclaimed."""
+        from settings.notifications import get_settings
+        if not get_settings().is_enabled("payg0_pending_reminders"):
+            return
+
+        chat_id = self._owner_chat_id
+        if not chat_id:
+            return
+
+        try:
+            import requests as _req
+            import datetime
+
+            resp = _req.get(
+                "https://api.payg0.io/api/v1/payments/history",
+                headers={"X-API-Key": self._payg0_api_key},
+                params={"limit": 50},
+                timeout=15,
+            )
+            resp.raise_for_status()
+            data  = resp.json()
+            items = data if isinstance(data, list) else (
+                data.get("transactions") or data.get("payments") or
+                data.get("data") or []
+            )
+
+            new_pending = [
+                tx for tx in items
+                if tx.get("status", "").upper() == "PENDING"
+                and tx.get("id") not in self._notified_pending_ids
+            ]
+
+            if not new_pending:
+                return
+
+            lines = ["⏳ Tienes pagos enviados que aún no han sido reclamados:\n"]
+            for tx in new_pending:
+                tx_id     = tx.get("id", "")
+                amount    = tx.get("amount", "?")
+                recipient = tx.get("receiver_email") or tx.get("recipient") or tx.get("receiver_id", "?")
+                created   = str(tx.get("created_at", tx.get("createdAt", "")))[:10]
+                lines.append(f"• ${amount} MXN → {recipient} (enviado el {created})")
+                self._notified_pending_ids.add(tx_id)
+
+            lines.append("\nPuedes pedirme que cancele alguno si ya no lo necesitas.")
+            await context.bot.send_message(chat_id=chat_id, text="\n".join(lines))
+            logger.info(f"[Payg0PendingCheck] Notified about {len(new_pending)} pending payment(s).")
+
+        except Exception as e:
+            logger.exception(f"Error in Payg0 pending check job: {e}")
 
     async def _job_waha_health_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Every 5 minutes: checks if WAHA / WhatsApp session is reachable.

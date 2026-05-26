@@ -111,6 +111,67 @@ def read_calendar_events(
         return f"Error al leer el calendario: {e}"
 
 
+def get_upcoming_events_structured(
+    credentials_json: str,
+    minutes_ahead: int = 60,
+    timezone: str = "America/Mexico_City",
+) -> list[dict]:
+    """
+    Returns timed events starting within the next `minutes_ahead` minutes.
+
+    Each dict contains:
+      id       — Google Calendar event ID
+      title    — event summary
+      start    — datetime (timezone-aware)
+      end      — datetime (timezone-aware)
+      location — str or ""
+
+    Returns [] on any error or if no credentials are configured.
+    """
+    if not credentials_json:
+        return []
+    try:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo(timezone)
+    except Exception:
+        import zoneinfo
+        tz = zoneinfo.ZoneInfo("America/Mexico_City")
+
+    try:
+        service  = _get_service(credentials_json)
+        now      = datetime.now(tz=tz)
+        look_end = now + timedelta(minutes=minutes_ahead)
+
+        result = service.events().list(
+            calendarId="primary",
+            timeMin=now.isoformat(),
+            timeMax=look_end.isoformat(),
+            maxResults=20,
+            singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+
+        events = []
+        for ev in result.get("items", []):
+            start_raw = ev.get("start", {})
+            end_raw   = ev.get("end", {})
+            if "dateTime" not in start_raw:
+                continue  # skip all-day events
+            dt_start = datetime.fromisoformat(start_raw["dateTime"]).astimezone(tz)
+            dt_end   = datetime.fromisoformat(end_raw["dateTime"]).astimezone(tz)
+            events.append({
+                "id":       ev.get("id", ""),
+                "title":    ev.get("summary", "(sin título)"),
+                "start":    dt_start,
+                "end":      dt_end,
+                "location": ev.get("location", ""),
+            })
+        return events
+    except Exception as e:
+        logger.warning(f"[Calendar] get_upcoming_events_structured error: {e}")
+        return []
+
+
 def create_calendar_event(
     credentials_json: str,
     title: str,

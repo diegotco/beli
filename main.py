@@ -146,6 +146,7 @@ def main() -> None:
         x_bearer_token=config.X_BEARER_TOKEN,
         x_access_token=config.X_ACCESS_TOKEN,
         x_access_token_secret=config.X_ACCESS_TOKEN_SECRET,
+        payg0_api_key=config.PAYG0_API_KEY,
     )
 
     # ── WhatsApp webhook ──────────────────────────────────────────────────────

@@ -5,14 +5,16 @@ Stores a JSON file at data/notification_settings.json.
 All keys default to False (notifications off by default).
 
 Keys:
-  whatsapp_direct     — direct WhatsApp messages
-  whatsapp_groups     — WhatsApp group messages
-  telegram_direct     — direct Telegram messages
-  telegram_groups     — Telegram group/channel messages
-  x_mentions          — X mentions and replies
-  x_likes             — X like count changes
-  x_dms               — X direct messages
-  calendar_reminders  — daily morning agenda summary
+  whatsapp_direct        — direct WhatsApp messages
+  whatsapp_groups        — WhatsApp group messages
+  telegram_direct        — direct Telegram messages
+  telegram_groups        — Telegram group/channel messages
+  x_mentions             — X mentions and replies
+  x_likes                — X like count changes
+  x_dms                  — X direct messages
+  calendar_reminders     — daily morning agenda summary
+  event_reminders        — 30-min before event alerts
+  payg0_pending_reminders — reminder when outgoing payments are unclaimed
 """
 import json
 import logging
@@ -33,7 +35,10 @@ _DEFAULTS: dict[str, bool] = {
     "x_likes":    False,
     "x_dms":      False,
     # Google Calendar
-    "calendar_reminders": False,
+    "calendar_reminders":      False,
+    "event_reminders":         False,
+    # Payg0
+    "payg0_pending_reminders": False,
 }
 
 
