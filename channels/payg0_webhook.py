@@ -32,14 +32,29 @@ _EVENT_LABEL = {
 
 
 def _verify_signature(body: bytes, signature_header: str, secret: str) -> bool:
-    """Verifies the Payg0 HMAC-SHA256 signature."""
+    """Verifies the Payg0 HMAC-SHA256 signature.
+
+    Accepts both formats Payg0 may send:
+      - raw hex:         "b7e1a4f2c9d8..."
+      - prefixed:        "sha256=b7e1a4f2c9d8..."
+    """
     if not secret:
         return True  # Skip verification if no secret configured
     try:
-        expected = "sha256=" + hmac.new(
-            secret.encode(), body, hashlib.sha256
-        ).hexdigest()
-        return hmac.compare_digest(expected, signature_header)
+        digest   = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        prefixed = "sha256=" + digest
+        # Accept either format
+        valid = (
+            hmac.compare_digest(digest,   signature_header) or
+            hmac.compare_digest(prefixed, signature_header)
+        )
+        if not valid:
+            logger.warning(
+                f"[Payg0] Signature mismatch — "
+                f"header='{signature_header[:20]}…' "
+                f"expected='{digest[:20]}…'"
+            )
+        return valid
     except Exception as e:
         logger.warning(f"[Payg0] Signature verification error: {e}")
         return False
@@ -72,11 +87,20 @@ def handle_payg0_webhook(
     Called from the HTTP server thread — must be synchronous.
     """
     try:
+        logger.info(
+            f"[Payg0] Webhook POST received — "
+            f"has_signature={bool(signature_header)} "
+            f"has_secret={bool(webhook_secret)} "
+            f"body_size={len(raw_body)}b"
+        )
+
         # Verify signature
         if signature_header and webhook_secret:
             if not _verify_signature(raw_body, signature_header, webhook_secret):
                 logger.warning("[Payg0] Invalid webhook signature — ignoring.")
                 return
+        elif webhook_secret and not signature_header:
+            logger.warning("[Payg0] PAYG0_WEBHOOK_SECRET is set but no signature header received.")
 
         event = payload.get("event", payload.get("type", ""))
         data  = payload.get("data", payload.get("payload", payload))
