@@ -11,6 +11,7 @@ data/*.session
 data/contact_cache.json
 data/beli_session.session
 data/google_calendar_credentials.json
+data/gmail_credentials.json
 
 # Google OAuth client secret (never commit)
 google_client_secret.json
