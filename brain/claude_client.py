@@ -25,9 +25,15 @@ MAX_TOOL_ROUNDS = 5  # Safety limit to prevent infinite tool loops
 # Tools that perform real-world sends — their results are the source of truth
 ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner", "send_gmail_message"}
 
+# Tasks tools — tracked separately so we can catch task-related hallucinations
+TASK_TOOLS = {"add_to_shopping_list", "create_task"}
+
 # Signal returned by every successful tool execution (defined in email_sender,
 # telegram_sender, and whatsapp_sender).  This is the ONLY accepted proof of a completed send.
 SUCCESS_SIGNAL = "✓ ENVIADO EXITOSAMENTE"
+
+# Signal prefix returned by add_to_shopping_list on success
+TASK_SUCCESS_SIGNAL = "✓ Agregué"
 
 # Spanish phrases Claude uses when it (falsely) claims to have sent something
 _SUCCESS_CLAIM_PATTERNS = [
@@ -46,11 +52,29 @@ _SUCCESS_CLAIM_PATTERNS = [
     "envié exitosamente",
 ]
 
+# Phrases Claude uses when it (falsely) claims to have added tasks/shopping items
+_TASK_CLAIM_PATTERNS = [
+    "agregué",
+    "añadí",
+    "añadí a tu lista",
+    "agregué a tu lista",
+    "los agregué",
+    "ya los agregué",
+    "guardé en tu lista",
+    "actualicé tu lista",
+]
+
 
 def _claims_success(text: str) -> bool:
-    """Returns True if the text contains a false-success pattern."""
+    """Returns True if the text contains a false send-success pattern."""
     lower = text.lower()
     return any(p in lower for p in _SUCCESS_CLAIM_PATTERNS)
+
+
+def _claims_task_success(text: str) -> bool:
+    """Returns True if the text claims to have added tasks/shopping items."""
+    lower = text.lower()
+    return any(p in lower for p in _TASK_CLAIM_PATTERNS)
 
 
 class BelisBrain:
@@ -121,6 +145,7 @@ class BelisBrain:
         # Collect results from action tools called during this turn.
         # Used by the anti-hallucination guard below.
         action_tool_results: list[str] = []
+        task_tool_results:   list[str] = []
         _hallucination_retry_done = False  # allow one automatic retry
 
         for round_num in range(MAX_TOOL_ROUNDS):
@@ -179,9 +204,11 @@ class BelisBrain:
                     result = await execute_tool(block.name, block.input)
                     logger.info(f"Tool result: {result}")
 
-                    # Track results from send actions for the honesty guard
+                    # Track results from send/task actions for the honesty guard
                     if block.name in ACTION_TOOLS:
                         action_tool_results.append(result)
+                    if block.name in TASK_TOOLS:
+                        task_tool_results.append(result)
 
                     tool_results.append({
                         "type": "tool_result",
@@ -240,7 +267,7 @@ class BelisBrain:
                             "role": "user",
                             "content": (
                                 "Error interno: respondiste con texto en lugar de llamar a la herramienta. "
-                                "Debes llamar AHORA al tool de envío correspondiente — no respondas con texto, "
+                                "Debes llamar AHORA al tool correspondiente — no respondas con texto, "
                                 "solo ejecuta el tool call."
                             ),
                         })
@@ -250,7 +277,47 @@ class BelisBrain:
                     )
                     return (
                         "Hubo un problema interno al ejecutar la acción. "
-                        "Por favor intenta enviar el mensaje de nuevo."
+                        "Por favor intenta de nuevo."
+                    )
+
+            # ── Task anti-hallucination guard ───────────────────────────────
+            # Catches cases where Claude claims to have added items to the
+            # shopping list without actually calling add_to_shopping_list.
+            task_confirmed = any(TASK_SUCCESS_SIGNAL in r for r in task_tool_results)
+
+            if _claims_task_success(final_text) and not task_confirmed:
+                logger.error(
+                    f"TASK HALLUCINATION GUARD fired — final_text[:200]={final_text[:200]!r} "
+                    f"task_tool_results={task_tool_results}"
+                )
+                if task_tool_results:
+                    # Tool ran but returned an error
+                    last_result = task_tool_results[-1]
+                    logger.error(f"TASK HALLUCINATION BLOCKED: tool returned error: {last_result}")
+                    return (
+                        f"No pude agregar los ítems a tu lista. Esto es lo que reportó el sistema:\n\n"
+                        f"{last_result}"
+                    )
+                else:
+                    # Tool was never called — pure fabrication
+                    if not _hallucination_retry_done:
+                        _hallucination_retry_done = True
+                        logger.warning(
+                            "TASK HALLUCINATION: claimed to add items without calling tool — injecting retry"
+                        )
+                        messages.append({"role": "assistant", "content": response.content})
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                "Error interno: dijiste que agregaste los ítems pero no llamaste a "
+                                "add_to_shopping_list. Debes llamar AHORA a add_to_shopping_list con "
+                                "todos los ítems en el array 'items'. No respondas con texto, solo ejecuta el tool call."
+                            ),
+                        })
+                        continue  # retry
+                    logger.error("TASK HALLUCINATION BLOCKED (2nd attempt): no tool call.")
+                    return (
+                        "Hubo un problema al agregar los ítems. Por favor intenta de nuevo."
                     )
 
             return final_text
