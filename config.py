@@ -114,6 +114,7 @@ class Config:
 
     # Payg0 (payments in MXN)
     PAYG0_API_KEY: str = os.getenv("PAYG0_API_KEY", "")
+    PAYG0_WEBHOOK_SECRET: str = os.getenv("PAYG0_WEBHOOK_SECRET", "")
 
     # X / Twitter monitoring
     X_API_KEY: str = os.getenv("X_API_KEY", "")

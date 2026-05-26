@@ -18,6 +18,7 @@ from memory.manager import MemoryManager
 from channels.telegram import TelegramChannel
 from channels.whatsapp_webhook import handle_webhook
 from channels.email_webhook import handle_email_webhook, register_webhook
+from channels.payg0_webhook import handle_payg0_webhook, register_payg0_webhook
 from tools.executor import set_memory
 
 logger = logging.getLogger("beli.main")
@@ -62,11 +63,16 @@ class _HealthHandler(BaseHTTPRequestHandler):
             callback = _HealthHandler.whatsapp_callback
         elif self.path == "/email/webhook":
             callback = _HealthHandler.email_callback
+        elif self.path == "/payg0/webhook":
+            callback = _HealthHandler.payg0_callback
 
         if callback:
             try:
-                payload = json.loads(body)
-                threading.Thread(target=callback, args=(payload,), daemon=True).start()
+                payload   = json.loads(body)
+                signature = self.headers.get("X-Payg0-Signature", "")
+                threading.Thread(
+                    target=callback, args=(payload, body, signature), daemon=True
+                ).start()
             except Exception as e:
                 logger.error(f"Webhook parse error ({self.path}): {e}")
 
@@ -144,7 +150,7 @@ def main() -> None:
 
     # ── WhatsApp webhook ──────────────────────────────────────────────────────
     if config.OWNER_TELEGRAM_CHAT_ID and config.WAHA_URL:
-        def _on_whatsapp(payload: dict) -> None:
+        def _on_whatsapp(payload: dict, _body: bytes = b"", _sig: str = "") -> None:
             handle_webhook(
                 payload=payload,
                 bot_token=config.TELEGRAM_BOT_TOKEN,
@@ -161,7 +167,7 @@ def main() -> None:
 
     # ── Email webhook ─────────────────────────────────────────────────────────
     if config.OWNER_TELEGRAM_CHAT_ID and config.AGENTMAIL_API_KEY:
-        def _on_email(payload: dict) -> None:
+        def _on_email(payload: dict, _body: bytes = b"", _sig: str = "") -> None:
             handle_email_webhook(
                 payload=payload,
                 bot_token=config.TELEGRAM_BOT_TOKEN,
@@ -179,6 +185,29 @@ def main() -> None:
             register_webhook(config.AGENTMAIL_API_KEY, config.AGENTMAIL_INBOX_ID, webhook_url)
     else:
         logger.info("Email webhook disabled (AGENTMAIL_API_KEY or OWNER_TELEGRAM_CHAT_ID not set).")
+
+    # ── Payg0 webhook ─────────────────────────────────────────────────────────
+    if config.OWNER_TELEGRAM_CHAT_ID and config.PAYG0_API_KEY:
+        def _on_payg0(payload: dict, raw_body: bytes = b"", signature: str = "") -> None:
+            handle_payg0_webhook(
+                payload=payload,
+                raw_body=raw_body,
+                signature_header=signature,
+                bot_token=config.TELEGRAM_BOT_TOKEN,
+                owner_chat_id=config.OWNER_TELEGRAM_CHAT_ID,
+                webhook_secret=config.PAYG0_WEBHOOK_SECRET,
+            )
+        _HealthHandler.payg0_callback = _on_payg0
+        logger.info("Payg0 webhook handler registered.")
+
+        # Auto-register webhook with Payg0 if BELI_PUBLIC_URL is set
+        if config.BELI_PUBLIC_URL and not config.PAYG0_WEBHOOK_SECRET:
+            webhook_url = f"{config.BELI_PUBLIC_URL.rstrip('/')}/payg0/webhook"
+            secret = register_payg0_webhook(config.PAYG0_API_KEY, webhook_url)
+            if secret:
+                logger.info(f"[Payg0] Webhook secret: {secret} — add as PAYG0_WEBHOOK_SECRET in Railway.")
+    else:
+        logger.info("Payg0 webhook disabled (PAYG0_API_KEY or OWNER_TELEGRAM_CHAT_ID not set).")
 
     # ── HTTP server ───────────────────────────────────────────────────────────
     _start_health_server()
