@@ -8,7 +8,7 @@ from config import config
 from tools.telegram_sender import find_telegram_contact, send_as_owner, read_telegram_chats, read_chat_history, edit_telegram_message, delete_telegram_message
 from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history, edit_whatsapp_message, delete_whatsapp_message, send_whatsapp_image
 from tools.email_sender import send_email
-from tools.payg0_tool import payg0_balance, payg0_transactions, payg0_send_payment
+from tools.payg0_tool import payg0_balance, payg0_transactions, payg0_send_payment, payg0_payment_detail, payg0_cancel_payment, payg0_check_tier
 from tools.calendar_tool import read_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event
 from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
 from tools.tasks_tool import (
@@ -376,12 +376,27 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             limit=int(tool_input.get("limit", 10)),
         )
 
+    if tool_name == "payg0_check_tier":
+        return payg0_check_tier(api_key=config.PAYG0_API_KEY)
+
     if tool_name == "payg0_send_payment":
         return payg0_send_payment(
             api_key=config.PAYG0_API_KEY,
             recipient=tool_input.get("recipient", ""),
             amount=float(tool_input.get("amount", 0)),
             description=tool_input.get("description", ""),
+        )
+
+    if tool_name == "payg0_payment_detail":
+        return payg0_payment_detail(
+            api_key=config.PAYG0_API_KEY,
+            payment_id=tool_input.get("payment_id", ""),
+        )
+
+    if tool_name == "payg0_cancel_payment":
+        return payg0_cancel_payment(
+            api_key=config.PAYG0_API_KEY,
+            payment_id=tool_input.get("payment_id", ""),
         )
 
     if tool_name == "get_x_my_tweets":

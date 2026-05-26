@@ -559,6 +559,21 @@ TOOLS = [
         },
     },
     {
+        "name": "payg0_check_tier",
+        "description": (
+            "Consulta el tier activo de Payg0, los límites mensuales de envío y recepción, "
+            "y el porcentaje de uso del mes. "
+            "SIEMPRE llama esta herramienta ANTES de ejecutar payg0_send_payment para verificar "
+            "que el dueño tiene límite de envío disponible. "
+            "También úsala cuando el dueño pregunte si puede seguir recibiendo pagos o cuánto le queda del límite."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
         "name": "payg0_send_payment",
         "description": (
             "Envía un pago en MXN a través de Payg0. "
@@ -585,6 +600,42 @@ TOOLS = [
                 },
             },
             "required": ["recipient", "amount"],
+        },
+    },
+    {
+        "name": "payg0_payment_detail",
+        "description": (
+            "Obtiene el detalle completo de una transacción Payg0 por su ID. "
+            "Úsala cuando el dueño quiera ver el estado, monto o información de un pago específico."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "payment_id": {
+                    "type": "string",
+                    "description": "ID de la transacción Payg0 (UUID completo o parcial).",
+                },
+            },
+            "required": ["payment_id"],
+        },
+    },
+    {
+        "name": "payg0_cancel_payment",
+        "description": (
+            "Cancela un pago Payg0 que esté en estado PENDING. "
+            "Solo funciona si el dueño es el emisor del pago. "
+            "SIEMPRE confirma con el dueño antes de cancelar — muestra el ID y monto del pago "
+            "y espera un 'sí' explícito."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "payment_id": {
+                    "type": "string",
+                    "description": "ID completo de la transacción a cancelar.",
+                },
+            },
+            "required": ["payment_id"],
         },
     },
     {
