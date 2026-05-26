@@ -367,15 +367,20 @@ class TelegramChannel:
     async def _cmd_memory(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Shows the saved facts about the user."""
         user_id = str(update.effective_user.id)
-        facts = await self.memory.get_facts(CHANNEL, user_id)
-        if not facts:
-            await update.message.reply_text(
-                "Todavía no tengo hechos guardados sobre ti. "
-                "Después de nuestras primeras conversaciones, iré aprendiendo cosas importantes automáticamente."
-            )
-        else:
-            lines = "\n".join(f"• {f}" for f in facts)
-            await update.message.reply_text(f"Esto es lo que recuerdo sobre ti:\n\n{lines}")
+        logger.info(f"[CMD] /memoria called by user_id={user_id}")
+        try:
+            facts = await self.memory.get_facts(CHANNEL, user_id)
+            if not facts:
+                await update.message.reply_text(
+                    "Todavía no tengo hechos guardados sobre ti. "
+                    "Después de nuestras primeras conversaciones, iré aprendiendo cosas importantes automáticamente."
+                )
+            else:
+                lines = "\n".join(f"• {f}" for f in facts)
+                await update.message.reply_text(f"Esto es lo que recuerdo sobre ti:\n\n{lines}")
+        except Exception as e:
+            logger.exception(f"[CMD] /memoria error for user_id={user_id}: {e}")
+            await update.message.reply_text(f"❌ Error al leer la memoria: {e}")
 
     # ------------------------------------------------------------------
     # NOTIFICATION SETTINGS
@@ -448,12 +453,17 @@ class TelegramChannel:
 
     async def _cmd_notifications(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Shows the notification settings menu."""
-        await update.message.reply_text(
-            "🔔 Notificaciones en vivo\n\n"
-            "Activa las fuentes de las que quieres recibir mensajes en tiempo real.\n"
-            "Por defecto todo está desactivado.",
-            reply_markup=self._notifications_keyboard(),
-        )
+        logger.info(f"[CMD] /notificaciones called by user_id={update.effective_user.id}")
+        try:
+            await update.message.reply_text(
+                "🔔 Notificaciones en vivo\n\n"
+                "Activa las fuentes de las que quieres recibir notificaciones en tiempo real.\n"
+                "Por defecto todo está desactivado.",
+                reply_markup=self._notifications_keyboard(),
+            )
+        except Exception as e:
+            logger.exception(f"[CMD] /notificaciones error: {e}")
+            await update.message.reply_text(f"❌ Error al abrir notificaciones: {e}")
 
     async def _cb_notifications(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handles inline button presses for the notification settings menu."""
@@ -484,6 +494,10 @@ class TelegramChannel:
                 page = "messaging"
             elif setting_key in ("x_mentions", "x_likes", "x_dms"):
                 page = "x"
+            elif setting_key in ("calendar_reminders", "event_reminders"):
+                page = "agenda"
+            elif setting_key == "payg0_pending_reminders":
+                page = "payments"
             else:
                 page = "main"
             status_text = "✅ Activado" if new_value else "🔕 Desactivado"
@@ -1043,8 +1057,16 @@ class TelegramChannel:
             logger.exception(f"Error in DB backup job: {e}")
 
     async def _error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Logs unhandled errors from the bot."""
+        """Logs unhandled errors from the bot and notifies the user when possible."""
         logger.error(f"Unhandled Telegram error: {context.error}", exc_info=context.error)
+        # Try to notify the user so errors are never silent
+        try:
+            if isinstance(update, Update) and update.effective_message:
+                await update.effective_message.reply_text(
+                    f"❌ Ocurrió un error inesperado: {context.error}"
+                )
+        except Exception:
+            pass  # Don't let the error handler itself crash
 
     # ------------------------------------------------------------------
     # START
