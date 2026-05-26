@@ -276,6 +276,27 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
         # Any other list: block (allowlist approach)
         return None
 
+    if tool_name == "add_to_shopping_list":
+        items = tool_input.get("items", [])
+        if not items:
+            return "No se especificaron ítems."
+        live_id = find_list_id_by_name(config.GOOGLE_CALENDAR_CREDENTIALS, "compras")
+        list_id = live_id or config.TASKS_SHOPPING_LIST_ID
+        results = []
+        for item in items:
+            r = create_task(
+                credentials_json=config.GOOGLE_CALENDAR_CREDENTIALS,
+                title=item,
+                list_id=list_id,
+            )
+            results.append(r)
+        added = [item for item, r in zip(items, results) if "Error" not in r]
+        failed = [item for item, r in zip(items, results) if "Error" in r]
+        msg = f"✓ Agregué {len(added)} ítems a tu lista de compras: {', '.join(added)}."
+        if failed:
+            msg += f"\n⚠️ No se pudieron agregar: {', '.join(failed)}."
+        return msg
+
     if tool_name == "list_task_lists":
         # Show the real shopping list ID so Beli always uses the correct one
         live_id = find_list_id_by_name(

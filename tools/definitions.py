@@ -381,10 +381,30 @@ TOOLS = [
         },
     },
     {
+        "name": "add_to_shopping_list",
+        "description": (
+            "Adds one or more items to the owner's shopping list (Lista de compras) in Google Tasks. "
+            "Use this whenever the owner asks to add items to the shopping list or grocery list. "
+            "Accepts multiple items at once — always use this instead of create_task for shopping list additions."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of items to add to the shopping list, e.g. ['Pepino', 'Pimiento', 'Humus'].",
+                },
+            },
+            "required": ["items"],
+        },
+    },
+    {
         "name": "create_task",
         "description": (
             "Creates a new task in a Google Tasks list. "
-            "Use this when the owner asks to add, create, or save a task or to-do item."
+            "Use this when the owner asks to add, create, or save a task or to-do item. "
+            "For shopping list items, use add_to_shopping_list instead."
         ),
         "input_schema": {
             "type": "object",
