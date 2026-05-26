@@ -199,7 +199,8 @@ class TelegramChannel:
             )
             logger.info("Event reminder job active — checking every 10 minutes.")
 
-        # Payg0 pending payments check — every 4 hours
+        # Payg0 pending check — every 4 hours (unclaimed outgoing payments only)
+        # Received payments are handled in real-time via payment.received webhook
         if self._payg0_api_key and self._owner_chat_id:
             self.app.job_queue.run_repeating(
                 self._job_payg0_pending_check,
@@ -912,7 +913,10 @@ class TelegramChannel:
             logger.exception(f"Error in event reminder job: {e}")
 
     async def _job_payg0_pending_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Every 4 hours: notifies about outgoing Payg0 payments still unclaimed."""
+        """Every 4 hours: notifies about outgoing Payg0 payments still unclaimed.
+
+        Received payments are handled in real-time via the payment.received webhook.
+        """
         from settings.notifications import get_settings
         if not get_settings().is_enabled("payg0_pending_reminders"):
             return
@@ -923,7 +927,6 @@ class TelegramChannel:
 
         try:
             import requests as _req
-            import datetime
 
             resp = _req.get(
                 "https://api.payg0.io/api/v1/payments/history",
@@ -953,7 +956,11 @@ class TelegramChannel:
                 amount    = tx.get("amount", "?")
                 recipient = tx.get("receiver_email") or tx.get("recipient") or tx.get("receiver_id", "?")
                 created   = str(tx.get("created_at", tx.get("createdAt", "")))[:10]
-                lines.append(f"• ${amount} MXN → {recipient} (enviado el {created})")
+                desc      = tx.get("description", "")
+                line      = f"• ${amount} MXN → {recipient} ({created})"
+                if desc:
+                    line += f" — {desc}"
+                lines.append(line)
                 self._notified_pending_ids.add(tx_id)
 
             lines.append("\nPuedes pedirme que cancele alguno si ya no lo necesitas.")

@@ -15,6 +15,7 @@ import requests
 logger = logging.getLogger("beli.payg0.webhook")
 
 _EMOJI = {
+    "payment.received":   "💰",
     "payment.completed":  "💸",
     "payment.pending":    "⏳",
     "payment.failed":     "❌",
@@ -23,7 +24,8 @@ _EMOJI = {
 }
 
 _EVENT_LABEL = {
-    "payment.completed":  "Pago recibido",
+    "payment.received":   "Pago recibido",
+    "payment.completed":  "Pago completado",
     "payment.pending":    "Pago pendiente de reclamación",
     "payment.failed":     "Pago fallido",
     "payment.cancelled":  "Pago cancelado",
@@ -124,7 +126,11 @@ def handle_payg0_webhook(
         # Only notify for incoming payments (sender != owner) or all events
         lines = [f"{emoji} Payg0 — {label}"]
 
-        if event == "payment.completed":
+        if event == "payment.received":
+            sender = data.get("sender_id", data.get("sender", "?"))
+            lines.append(f"De: {sender}")
+            lines.append(f"Monto: ${amount} MXN")
+        elif event == "payment.completed":
             lines.append(f"De: {sender}")
             lines.append(f"Monto: ${amount} MXN")
         elif event == "payment.pending":
@@ -196,8 +202,8 @@ def register_payg0_webhook(api_key: str, webhook_url: str) -> str:
     If webhook already exists (409), attempts rotate-secret to get a fresh secret.
     """
     _HEADERS = {"X-API-Key": api_key, "Content-Type": "application/json"}
-    _EVENTS  = ["payment.completed", "payment.pending", "payment.failed",
-                "payment.cancelled", "payment.expired"]
+    _EVENTS  = ["payment.received", "payment.completed", "payment.pending",
+                "payment.failed", "payment.cancelled", "payment.expired"]
     try:
         resp = requests.post(
             "https://api.payg0.io/api/v1/webhooks",
