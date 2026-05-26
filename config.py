@@ -112,6 +112,9 @@ class Config:
     BIRTHDAY_HOUR: int = int(os.getenv("BIRTHDAY_HOUR", "6"))          # 6 AM CDMX
     MORNING_AGENDA_HOUR: int = int(os.getenv("MORNING_AGENDA_HOUR", "8"))  # 8 AM CDMX
 
+    # Payg0 (payments in MXN)
+    PAYG0_API_KEY: str = os.getenv("PAYG0_API_KEY", "")
+
     # X / Twitter monitoring
     X_API_KEY: str = os.getenv("X_API_KEY", "")
     X_API_SECRET: str = os.getenv("X_API_SECRET", "")

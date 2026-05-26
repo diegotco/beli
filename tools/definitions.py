@@ -530,6 +530,64 @@ TOOLS = [
         },
     },
     {
+        "name": "payg0_balance",
+        "description": (
+            "Consulta el saldo actual de la billetera Payg0 del dueño en MXN. "
+            "Úsala cuando el dueño pregunte cuánto dinero tiene en Payg0 o cuál es su saldo."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
+        "name": "payg0_transactions",
+        "description": (
+            "Muestra el historial de transacciones recientes de Payg0. "
+            "Úsala cuando el dueño quiera ver sus pagos, movimientos o historial de Payg0."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Número de transacciones a mostrar (default 10, máx 50).",
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "payg0_send_payment",
+        "description": (
+            "Envía un pago en MXN a través de Payg0. "
+            "El destinatario puede ser un @username de Payg0 o un correo electrónico. "
+            "Si el destinatario no tiene cuenta, Payg0 le enviará un correo para crearla. "
+            "SIEMPRE muestra un resumen (destinatario, monto, descripción) y espera "
+            "confirmación explícita del dueño antes de ejecutar. "
+            "Nunca envíes un pago sin que el dueño haya dicho 'sí', 'dale', 'envíalo' o equivalente."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "recipient": {
+                    "type": "string",
+                    "description": "@username de Payg0 o correo electrónico del destinatario.",
+                },
+                "amount": {
+                    "type": "number",
+                    "description": "Monto a enviar en MXN (ej: 100.00).",
+                },
+                "description": {
+                    "type": "string",
+                    "description": "Descripción opcional del pago.",
+                },
+            },
+            "required": ["recipient", "amount"],
+        },
+    },
+    {
         "name": "get_x_my_tweets",
         "description": (
             "Returns Diego's most recent tweets from @DiegoCapital_99 with AGGREGATE engagement metrics "
