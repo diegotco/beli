@@ -377,9 +377,14 @@ class TelegramChannel:
                 )
             else:
                 lines = "\n".join(f"• {f}" for f in facts)
-                full_text = f"Esto es lo que recuerdo sobre ti:\n\n{lines}"
-                for chunk in _split_text(full_text, 4096):
-                    await update.message.reply_text(chunk)
+                full_text = f"Esto es lo que recuerdo sobre ti ({len(facts)} hechos):\n\n{lines}"
+                import io
+                doc = io.BytesIO(full_text.encode("utf-8"))
+                doc.name = "memoria.txt"
+                await update.message.reply_document(
+                    document=doc,
+                    caption=f"Tengo {len(facts)} hechos guardados sobre ti.",
+                )
         except Exception as e:
             logger.exception(f"[CMD] /memoria error for user_id={user_id}: {e}")
             await update.message.reply_text(f"❌ Error al leer la memoria: {e}")
