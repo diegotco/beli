@@ -123,39 +123,85 @@ def handle_payg0_webhook(
         logger.exception(f"[Payg0] Error handling webhook: {e}")
 
 
+def _find_webhook_id(api_key: str, webhook_url: str) -> str:
+    """Finds the Payg0 webhook ID for the given URL via GET /webhooks."""
+    try:
+        resp = requests.get(
+            "https://api.payg0.io/api/v1/webhooks",
+            headers={"X-API-Key": api_key},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        items = data if isinstance(data, list) else data.get("webhooks", data.get("data", []))
+        for wh in items:
+            if wh.get("url") == webhook_url:
+                return wh.get("id", "")
+    except Exception as e:
+        logger.warning(f"[Payg0] Could not list webhooks: {e}")
+    return ""
+
+
+def _rotate_webhook_secret(api_key: str, webhook_id: str) -> str:
+    """Rotates the secret for an existing webhook via POST /webhooks/{id}/rotate-secret."""
+    try:
+        resp = requests.post(
+            f"https://api.payg0.io/api/v1/webhooks/{webhook_id}/rotate-secret",
+            headers={"X-API-Key": api_key, "Content-Type": "application/json"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        return data.get("secret", data.get("signingSecret", ""))
+    except requests.HTTPError as e:
+        if e.response.status_code == 404:
+            logger.warning("[Payg0] rotate-secret endpoint not yet available.")
+        else:
+            logger.warning(f"[Payg0] rotate-secret failed: {e.response.status_code} — {e.response.text}")
+    except Exception as e:
+        logger.warning(f"[Payg0] rotate-secret error: {e}")
+    return ""
+
+
 def register_payg0_webhook(api_key: str, webhook_url: str) -> str:
     """
     Registers the Beli webhook URL with Payg0.
     Called at startup if BELI_PUBLIC_URL and PAYG0_API_KEY are set.
     Returns the webhook secret (to be saved as PAYG0_WEBHOOK_SECRET).
+
+    If webhook already exists (409), attempts rotate-secret to get a fresh secret.
     """
+    _HEADERS = {"X-API-Key": api_key, "Content-Type": "application/json"}
+    _EVENTS  = ["payment.completed", "payment.pending", "payment.failed",
+                "payment.cancelled", "payment.expired"]
     try:
         resp = requests.post(
             "https://api.payg0.io/api/v1/webhooks",
-            headers={"X-API-Key": api_key, "Content-Type": "application/json"},
-            json={
-                "url": webhook_url,
-                "events": [
-                    "payment.completed",
-                    "payment.pending",
-                    "payment.failed",
-                    "payment.cancelled",
-                    "payment.expired",
-                ],
-            },
+            headers=_HEADERS,
+            json={"url": webhook_url, "events": _EVENTS},
             timeout=15,
         )
         resp.raise_for_status()
-        data = resp.json()
+        data   = resp.json()
         secret = data.get("secret", data.get("signingSecret", ""))
         logger.info(f"[Payg0] Webhook registered at {webhook_url}")
         if secret:
-            logger.info("[Payg0] Webhook secret received — save as PAYG0_WEBHOOK_SECRET in Railway.")
+            logger.info(f"[Payg0] Webhook secret: {secret} — add as PAYG0_WEBHOOK_SECRET in Railway.")
         return secret
+
     except requests.HTTPError as e:
-        # 409 = webhook already exists — not an error
         if e.response.status_code == 409:
-            logger.info("[Payg0] Webhook already registered.")
+            logger.info("[Payg0] Webhook already registered — attempting rotate-secret to recover secret.")
+            webhook_id = _find_webhook_id(api_key, webhook_url)
+            if webhook_id:
+                secret = _rotate_webhook_secret(api_key, webhook_id)
+                if secret:
+                    logger.info(f"[Payg0] Rotated webhook secret: {secret} — add as PAYG0_WEBHOOK_SECRET in Railway.")
+                    return secret
+                else:
+                    logger.info("[Payg0] rotate-secret not available yet — webhook works without secret verification.")
+            else:
+                logger.info("[Payg0] Could not find webhook ID — webhook works without secret verification.")
             return ""
         logger.error(f"[Payg0] Failed to register webhook: {e.response.status_code} — {e.response.text}")
         return ""
