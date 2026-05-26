@@ -223,6 +223,12 @@ class BelisBrain:
             # ── Case 2: Claude gave a final text response ───────────────────
             text_blocks = [b for b in response.content if hasattr(b, "text")]
             if not text_blocks:
+                # If a task tool just succeeded, use its result as the confirmation
+                if task_tool_results and any(TASK_SUCCESS_SIGNAL in r for r in task_tool_results):
+                    return task_tool_results[-1]
+                # If a send tool just succeeded, confirm briefly
+                if action_tool_results and any(SUCCESS_SIGNAL in r for r in action_tool_results):
+                    return "Listo ✓"
                 logger.warning("Claude returned no text and no tool_use. Empty response.")
                 return "No pude generar una respuesta. Por favor intenta de nuevo."
 
