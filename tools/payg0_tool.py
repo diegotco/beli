@@ -53,21 +53,36 @@ def payg0_transactions(api_key: str, limit: int = 10) -> str:
         resp.raise_for_status()
         data = resp.json()
 
-        # Handle both list response and {"payments": [...]} shape
-        items = data if isinstance(data, list) else data.get("payments", data.get("data", []))
+        logger.info(f"[Payg0] /payments/history raw response keys: {list(data.keys()) if isinstance(data, dict) else f'list[{len(data)}]'}")
+        logger.info(f"[Payg0] /payments/history raw: {str(data)[:500]}")
+
+        # Handle all known response shapes
+        if isinstance(data, list):
+            items = data
+        elif isinstance(data, dict):
+            items = (
+                data.get("payments")
+                or data.get("data")
+                or data.get("transactions")
+                or data.get("results")
+                or data.get("items")
+                or []
+            )
+        else:
+            items = []
 
         if not items:
-            return "No hay transacciones recientes en Payg0."
+            return f"No hay transacciones recientes en Payg0. (Respuesta cruda: {str(data)[:300]})"
 
         lines = []
         for tx in items[:limit]:
-            tx_id     = tx.get("id", "")[:8]
+            tx_id     = str(tx.get("id", ""))[:8]
             status    = tx.get("status", "")
             amount    = tx.get("amount", "?")
-            recipient = tx.get("recipient", tx.get("to", "?"))
-            desc      = tx.get("description", "")
-            created   = tx.get("createdAt", tx.get("created_at", ""))[:10]
-            line = f"• [{created}] ${amount} MXN → {recipient} [{status}]"
+            recipient = tx.get("recipient", tx.get("to", tx.get("recipientId", "?")))
+            desc      = tx.get("description", tx.get("note", ""))
+            created   = str(tx.get("createdAt", tx.get("created_at", tx.get("date", ""))))[:10]
+            line = f"• [{created}] ID:{tx_id}… ${amount} MXN → {recipient} [{status}]"
             if desc:
                 line += f" — {desc}"
             lines.append(line)
