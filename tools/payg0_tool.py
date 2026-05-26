@@ -76,13 +76,13 @@ def payg0_transactions(api_key: str, limit: int = 10) -> str:
 
         lines = []
         for tx in items[:limit]:
-            tx_id     = str(tx.get("id", ""))[:8]
+            tx_id     = str(tx.get("id", ""))          # full UUID — never truncate
             status    = tx.get("status", "")
             amount    = tx.get("amount", "?")
             recipient = tx.get("recipient", tx.get("to", tx.get("recipientId", "?")))
             desc      = tx.get("description", tx.get("note", ""))
             created   = str(tx.get("createdAt", tx.get("created_at", tx.get("date", ""))))[:10]
-            line = f"• [{created}] ID:{tx_id}… ${amount} MXN → {recipient} [{status}]"
+            line = f"• [{created}] ID:{tx_id} ${amount} MXN → {recipient} [{status}]"
             if desc:
                 line += f" — {desc}"
             lines.append(line)
@@ -171,7 +171,7 @@ def payg0_payment_detail(api_key: str, payment_id: str) -> str:
         sender    = tx.get("sender", tx.get("from", "?"))
         desc      = tx.get("description", "")
         created   = tx.get("createdAt", tx.get("created_at", ""))[:19].replace("T", " ")
-        tx_id     = tx.get("id", payment_id)
+        tx_id     = tx.get("id", payment_id)   # full UUID
 
         lines = [
             f"ID: {tx_id}",
