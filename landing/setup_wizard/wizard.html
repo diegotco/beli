@@ -1110,6 +1110,15 @@ function showStep(idx) {
 function nextStep() { if (currentStep < steps.length - 1) showStep(currentStep + 1); }
 function prevStep() { if (currentStep > 0) showStep(currentStep - 1); }
 
+// ── Keyboard navigation (← →) ──
+document.addEventListener('keydown', function(e) {
+  const tag = document.activeElement.tagName;
+  // Don't hijack arrow keys when the user is typing in an input/textarea
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  if (e.key === 'ArrowRight') { e.preventDefault(); nextStep(); }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); prevStep(); }
+});
+
 // ═══════════════════════════════════════════
 // NAME REFS
 // ═══════════════════════════════════════════
