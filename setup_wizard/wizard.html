@@ -390,6 +390,14 @@
         </div>
         <label class="toggle-switch"><input type="checkbox" id="mod-payg0" onchange="toggleModule('payg0', this.checked)" /><span class="toggle-slider"></span></label>
       </div>
+      <div class="module-row" id="mod-row-agentmail">
+        <div class="module-emoji">✉️</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 7: AgentMail — correo propio</span><span data-lang-en>Module 7: AgentMail — own email</span></div>
+          <div class="module-desc"><span data-lang-es>Tu agente puede tener su propio correo electrónico para recibir emails.</span><span data-lang-en>Your agent can have its own email address to receive messages.</span></div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="mod-agentmail" onchange="toggleModule('agentmail', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
     </div>
   </div>
 
@@ -860,6 +868,36 @@
   </div>
 
   <!-- ══════════════════════════
+       MODULE 7: AGENTMAIL
+  ══════════════════════════ -->
+
+  <div class="step" id="step-agentmail-intro">
+    <span class="step-emoji">✉️</span>
+    <h2>
+      <span data-lang-es>Módulo 7: AgentMail — Correo propio</span>
+      <span data-lang-en>Module 7: AgentMail — Own email</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>AgentMail le da a tu agente su propio correo electrónico. Puede recibir emails y notificarte en Telegram. Crea una cuenta gratuita en agentmail.to.</span>
+      <span data-lang-en>AgentMail gives your agent its own email address. It can receive emails and notify you on Telegram. Create a free account at agentmail.to.</span>
+    </p>
+    <a href="https://agentmail.to" target="_blank" rel="noopener" class="step-link">🔗 agentmail.to</a>
+    <div class="field" style="margin-top: 16px;">
+      <label>AGENTMAIL_API_KEY</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-agentmail-key" placeholder="am_..." oninput="saveField('agentmail_key', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-agentmail-key', this)">👁</button>
+      </div>
+      <p class="hint"><span data-lang-es>Encuéntralo en tu dashboard de AgentMail.</span><span data-lang-en>Find it in your AgentMail dashboard.</span></p>
+    </div>
+    <div class="field">
+      <label>AGENTMAIL_INBOX_ID</label>
+      <input type="text" id="input-agentmail-inbox" placeholder="tuagente@agentmail.to" oninput="saveField('agentmail_inbox', this.value)" />
+      <p class="hint"><span data-lang-es>El correo del inbox que creaste en AgentMail.</span><span data-lang-en>The inbox email address you created in AgentMail.</span></p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
        FINAL SUMMARY
   ══════════════════════════ -->
 
@@ -928,7 +966,7 @@ const DEFAULT_STATE = {
   currentStep: 0,
   name: 'Beli',
   gender: 'f',
-  modules: { whatsapp: false, gmail: false, calendar: false, ghost: false, payg0: false },
+  modules: { whatsapp: false, gmail: false, calendar: false, ghost: false, payg0: false, agentmail: false },
   fields: {}
 };
 
@@ -1012,6 +1050,7 @@ const MODULE_STEPS = {
   calendar: ['step-cal-enable', 'step-cal-setup'],
   ghost:    ['step-ghost-intro', 'step-ghost-session'],
   payg0:    ['step-payg0-intro', 'step-payg0-webhook'],
+  agentmail: ['step-agentmail-intro'],
 };
 
 let steps = [];
@@ -1146,6 +1185,12 @@ function buildEnvText(revealed) {
     env += `PAYG0_WEBHOOK_SECRET=${mval('payg0_webhook_secret', revealed)}\n\n`;
   }
 
+  if (state.modules.agentmail) {
+    env += `# ── MODULE 7: AGENTMAIL ──\n`;
+    env += `AGENTMAIL_API_KEY=${mval('agentmail_key', revealed)}\n`;
+    env += `AGENTMAIL_INBOX_ID=${f.agentmail_inbox || ''}\n\n`;
+  }
+
   return env.trimEnd();
 }
 
@@ -1201,6 +1246,7 @@ function renderSummary() {
     { key: 'calendar',  emoji: '📅', es: 'Google Calendar + Lista de compras', en: 'Google Calendar + Shopping list' },
     { key: 'ghost',     emoji: '👻', es: 'Ghost mode en Telegram', en: 'Telegram ghost mode' },
     { key: 'payg0',     emoji: '💸', es: 'Payg0 — pagos en MXN', en: 'Payg0 — MXN payments' },
+    { key: 'agentmail', emoji: '✉️', es: 'AgentMail — correo propio', en: 'AgentMail — own email' },
   ];
 
   let html = '';
