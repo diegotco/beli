@@ -1,0 +1,1319 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wizard de instalación — Beli</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --cyan: #00e5ff;
+      --cyan-dim: rgba(0,229,255,0.15);
+      --bg: #050d12;
+      --bg-card: #0d1a22;
+      --bg-input: #071218;
+      --border: rgba(0,229,255,0.15);
+      --border2: rgba(255,255,255,0.08);
+      --text: #ddeef5;
+      --text-muted: #7a9bac;
+      --text-dim: #3a5a6a;
+      --green: #00e676;
+      --orange: #ffab40;
+      --red: #ff5252;
+      --radius: 14px;
+      --radius-sm: 8px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── PRIVACY BANNER ── */
+    #privacy-banner {
+      background: rgba(0,230,118,0.07);
+      border-bottom: 1px solid rgba(0,230,118,0.2);
+      padding: 10px 20px;
+      text-align: center;
+      font-size: 14px;
+      color: #a5d6a7;
+    }
+
+    /* ── TOP BAR ── */
+    #topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--border2);
+      background: var(--bg-card);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    #topbar .logo { font-weight: 800; font-size: 1.2rem; color: var(--cyan); letter-spacing: -0.02em; }
+    #lang-toggle { display: flex; gap: 3px; background: var(--bg); border: 1px solid var(--border2); border-radius: 7px; padding: 3px; }
+    #lang-toggle button {
+      background: none; border: none; color: var(--text-muted);
+      font-size: 12px; font-weight: 700; padding: 4px 10px;
+      border-radius: 5px; cursor: pointer; transition: all 0.2s; letter-spacing: 0.05em;
+    }
+    #lang-toggle button.active { background: var(--cyan); color: #000; }
+
+    /* ── PROGRESS ── */
+    #progress-wrap { padding: 16px 24px 0; }
+    #progress-label { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    #progress-bar-bg { background: rgba(255,255,255,0.06); border-radius: 100px; height: 6px; }
+    #progress-bar { background: var(--cyan); height: 6px; border-radius: 100px; transition: width 0.4s ease; width: 0%; }
+
+    /* ── MAIN CONTENT ── */
+    #wizard-body { max-width: 720px; margin: 0 auto; padding: 40px 24px 120px; }
+
+    .step { display: none; animation: fadeIn 0.3s ease; }
+    .step.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .step-emoji { font-size: 3rem; margin-bottom: 16px; display: block; }
+    .step h2 { font-size: clamp(1.4rem, 4vw, 2rem); font-weight: 800; color: #fff; margin-bottom: 10px; line-height: 1.2; }
+    .step .step-desc { color: var(--text-muted); font-size: 1rem; margin-bottom: 28px; line-height: 1.7; }
+
+    /* ── INPUTS ── */
+    .field { margin-bottom: 20px; }
+    .field label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .field input[type=text], .field input[type=password], .field input[type=url], .field textarea {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 16px;
+      padding: 12px 14px; outline: none; transition: border-color 0.2s; font-family: inherit;
+    }
+    .field input:focus, .field textarea:focus { border-color: var(--cyan); }
+    .field textarea { min-height: 100px; resize: vertical; }
+    .field .hint { font-size: 13px; color: var(--text-dim); margin-top: 6px; }
+    .field .hint a { color: var(--cyan); text-decoration: none; }
+    .field .hint a:hover { text-decoration: underline; }
+
+    /* password field */
+    .pw-wrap { position: relative; }
+    .pw-wrap input { padding-right: 48px; }
+    .pw-toggle {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 16px; padding: 4px;
+    }
+    .validation-msg { font-size: 13px; margin-top: 6px; }
+    .validation-msg.ok { color: var(--green); }
+    .validation-msg.err { color: var(--red); }
+
+    /* ── GENDER BUTTONS ── */
+    .gender-btns { display: flex; gap: 12px; margin-top: 8px; }
+    .gender-btn {
+      flex: 1; background: var(--bg-card); border: 2px solid var(--border2);
+      border-radius: var(--radius); color: var(--text); font-size: 1.1rem;
+      font-weight: 600; padding: 18px 12px; cursor: pointer; transition: all 0.2s;
+      text-align: center;
+    }
+    .gender-btn:hover { border-color: var(--cyan); }
+    .gender-btn.selected { border-color: var(--cyan); background: var(--cyan-dim); color: var(--cyan); }
+
+    /* ── MODULE TOGGLES ── */
+    .module-list { display: flex; flex-direction: column; gap: 12px; margin: 24px 0; }
+    .module-row {
+      display: flex; align-items: center; gap: 16px;
+      background: var(--bg-card); border: 1px solid var(--border2);
+      border-radius: var(--radius); padding: 16px 20px;
+      transition: border-color 0.2s;
+    }
+    .module-row.required { border-color: rgba(0,230,118,0.2); }
+    .module-row.enabled { border-color: rgba(0,229,255,0.25); }
+    .module-emoji { font-size: 1.6rem; flex-shrink: 0; }
+    .module-info { flex: 1; }
+    .module-name { font-weight: 700; font-size: 1rem; color: #fff; }
+    .module-desc { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+    .module-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 100px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .badge-required { background: rgba(0,230,118,0.12); color: var(--green); }
+    .badge-optional { background: rgba(255,255,255,0.06); color: var(--text-dim); }
+
+    /* toggle switch */
+    .toggle-switch { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: rgba(255,255,255,0.1);
+      border-radius: 100px; cursor: pointer; transition: 0.2s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; width: 18px; height: 18px;
+      left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s;
+    }
+    input:checked + .toggle-slider { background: var(--cyan); }
+    input:checked + .toggle-slider::before { transform: translateX(20px); background: #000; }
+
+    /* ── CODE / ENV PREVIEW ── */
+    .code-block {
+      position: relative; background: #020a0f; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 20px;
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', monospace;
+      font-size: 13px; color: #80c0d0; line-height: 1.8;
+      white-space: pre-wrap; word-break: break-all; max-height: 360px; overflow-y: auto;
+    }
+    .code-block .env-key { color: var(--cyan); }
+    .code-block .env-val { color: #b0e0ea; }
+    .code-block .env-val.hidden { color: var(--text-dim); }
+    .code-block .env-comment { color: var(--text-dim); }
+
+    .copy-btn {
+      background: var(--cyan); color: #000; border: none; border-radius: 6px;
+      padding: 8px 16px; font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: all 0.2s; margin-top: 10px;
+    }
+    .copy-btn:hover { background: #fff; }
+    .copy-btn.copied { background: var(--green); }
+    .reveal-btn {
+      background: transparent; color: var(--text-muted); border: 1px solid var(--border2);
+      border-radius: 6px; padding: 8px 14px; font-size: 13px; cursor: pointer;
+      margin-top: 10px; margin-left: 8px; transition: all 0.2s;
+    }
+    .reveal-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    /* ── STEP LINKS ── */
+    .step-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--cyan-dim); border: 1px solid rgba(0,229,255,0.3);
+      color: var(--cyan); padding: 9px 16px; border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 600; text-decoration: none; transition: all 0.2s;
+      margin-bottom: 8px; margin-right: 8px;
+    }
+    .step-link:hover { background: rgba(0,229,255,0.25); }
+
+    /* ── INFO BOXES ── */
+    .info-box {
+      border-radius: var(--radius-sm); padding: 14px 18px; font-size: 14px;
+      margin-bottom: 16px; line-height: 1.6;
+    }
+    .info-box.cyan { background: var(--cyan-dim); border: 1px solid rgba(0,229,255,0.2); color: #a0dde8; }
+    .info-box.green { background: rgba(0,230,118,0.07); border: 1px solid rgba(0,230,118,0.2); color: #a5d6a7; }
+    .info-box.orange { background: rgba(255,171,64,0.08); border: 1px solid rgba(255,171,64,0.2); color: #ffe0b2; }
+
+    /* ── PLACEHOLDER IMAGE ── */
+    .screenshot-placeholder {
+      background: var(--bg-card); border: 2px dashed var(--border2);
+      border-radius: var(--radius); padding: 32px; text-align: center;
+      color: var(--text-dim); font-size: 2rem; margin: 16px 0;
+    }
+    .screenshot-placeholder span { display: block; font-size: 13px; margin-top: 8px; font-family: monospace; }
+
+    /* ── COMMANDS ── */
+    .cmd {
+      background: #020a0f; border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 16px;
+      font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px;
+      color: var(--green); margin: 8px 0; display: flex; align-items: center;
+      justify-content: space-between; gap: 12px;
+    }
+    .cmd-copy { background: none; border: 1px solid var(--border2); color: var(--text-muted); border-radius: 4px; padding: 4px 8px; font-size: 12px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .cmd-copy:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    /* ── SUMMARY ── */
+    .summary-module {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-radius: var(--radius-sm);
+      background: var(--bg-card); margin-bottom: 8px;
+    }
+    .summary-module .check { font-size: 1.2rem; }
+    .summary-cost {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 24px; margin: 20px 0; text-align: center;
+    }
+    .cost-total { font-size: 2rem; font-weight: 800; color: var(--cyan); }
+    .cost-label { font-size: 14px; color: var(--text-muted); margin-top: 4px; }
+
+    /* ── NAV BUTTONS ── */
+    #nav-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: rgba(5,13,18,0.95); backdrop-filter: blur(12px);
+      border-top: 1px solid var(--border2); padding: 16px 24px;
+      display: flex; gap: 12px; justify-content: space-between; align-items: center;
+      z-index: 100;
+    }
+    .nav-btn {
+      background: none; border: 1px solid var(--border2); color: var(--text);
+      font-size: 16px; font-weight: 600; padding: 12px 24px; border-radius: var(--radius-sm);
+      cursor: pointer; transition: all 0.2s; min-width: 120px;
+    }
+    .nav-btn:hover { border-color: var(--cyan); color: var(--cyan); }
+    .nav-btn.primary { background: var(--cyan); color: #000; border-color: var(--cyan); }
+    .nav-btn.primary:hover { background: #fff; border-color: #fff; color: #000; }
+    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* lang visibility */
+    [data-lang-en] { display: none; }
+    .lang-en [data-lang-es] { display: none; }
+    .lang-en [data-lang-en] { display: revert; }
+    span[data-lang-en] { display: none; }
+    .lang-en span[data-lang-es] { display: none; }
+    .lang-en span[data-lang-en] { display: inline; }
+
+    @media (max-width: 600px) {
+      body { font-size: 16px; }
+      .gender-btns { flex-direction: column; }
+      #wizard-body { padding: 28px 16px 100px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PRIVACY BANNER -->
+<div id="privacy-banner">
+  <span data-lang-es>🔒 Todos tus datos se guardan solo en tu computadora. Nunca se envían a ningún servidor.</span>
+  <span data-lang-en>🔒 All your data is saved only on your computer. Never sent to any server.</span>
+</div>
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="logo">✦ Beli Wizard</div>
+  <div id="lang-toggle">
+    <button id="btn-es" class="active" onclick="setLang('es')">ES</button>
+    <button id="btn-en" onclick="setLang('en')">EN</button>
+  </div>
+</div>
+
+<!-- PROGRESS -->
+<div id="progress-wrap">
+  <div id="progress-label">
+    <span data-lang-es>Paso <span id="step-num">1</span> de <span id="step-total">1</span></span>
+    <span data-lang-en>Step <span id="step-num-en">1</span> of <span id="step-total-en">1</span></span>
+  </div>
+  <div id="progress-bar-bg"><div id="progress-bar"></div></div>
+</div>
+
+<!-- WIZARD BODY -->
+<div id="wizard-body">
+
+  <!-- ══════════════════════════
+       STEP: name
+  ══════════════════════════ -->
+  <div class="step active" id="step-name">
+    <span class="step-emoji">👋</span>
+    <h2>
+      <span data-lang-es>Primero: personalicemos tu asistente</span>
+      <span data-lang-en>First: let's personalize your assistant</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Este wizard te guía para instalar tu propio asistente de IA personal. Antes de empezar, ¿cómo se va a llamar?</span>
+      <span data-lang-en>This wizard guides you through installing your own personal AI assistant. Before we start — what will it be called?</span>
+    </p>
+    <div class="field">
+      <label data-lang-es>Nombre del asistente</label>
+      <label data-lang-en>Assistant name</label>
+      <input type="text" id="input-name" placeholder="Beli" oninput="saveName(this.value)" />
+      <p class="hint">
+        <span data-lang-es>Por defecto: "Beli". Puedes usar cualquier nombre.</span>
+        <span data-lang-en>Default: "Beli". You can use any name.</span>
+      </p>
+    </div>
+    <div class="field">
+      <label>
+        <span data-lang-es>¿Es masculino o femenino?</span>
+        <span data-lang-en>Masculine or feminine?</span>
+      </label>
+      <div class="gender-btns">
+        <button class="gender-btn" id="btn-masc" onclick="setGender('m')">👦 <span data-lang-es>Masculino</span><span data-lang-en>Masculine</span></button>
+        <button class="gender-btn" id="btn-fem" onclick="setGender('f')">👩 <span data-lang-es>Femenino</span><span data-lang-en>Feminine</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       STEP: modules
+  ══════════════════════════ -->
+  <div class="step" id="step-modules">
+    <span class="step-emoji">🧩</span>
+    <h2>
+      <span data-lang-es>¿Qué módulos quieres activar?</span>
+      <span data-lang-en>Which modules do you want to activate?</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>El Módulo 1 es obligatorio. Los demás son opcionales — solo activa los que necesitas.</span>
+      <span data-lang-en>Module 1 is required. The rest are optional — only enable the ones you need.</span>
+    </p>
+    <div class="module-list">
+      <div class="module-row required">
+        <div class="module-emoji">✅</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 1: Lo indispensable</span><span data-lang-en>Module 1: The essentials</span></div>
+          <div class="module-desc"><span data-lang-es>Telegram bot + Anthropic API + voz. Requerido.</span><span data-lang-en>Telegram bot + Anthropic API + voice. Required.</span></div>
+        </div>
+        <span class="module-badge badge-required"><span data-lang-es>Requerido</span><span data-lang-en>Required</span></span>
+      </div>
+      <div class="module-row" id="mod-row-whatsapp">
+        <div class="module-emoji">📱</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 2: WhatsApp</span><span data-lang-en>Module 2: WhatsApp</span></div>
+          <div class="module-desc"><span data-lang-es>Ghost mode — responde WhatsApp como tú.</span><span data-lang-en>Ghost mode — replies on WhatsApp as you.</span></div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="mod-whatsapp" onchange="toggleModule('whatsapp', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="module-row" id="mod-row-gmail">
+        <div class="module-emoji">📧</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 3: Gmail</span><span data-lang-en>Module 3: Gmail</span></div>
+          <div class="module-desc"><span data-lang-es>Redacta y resume correos.</span><span data-lang-en>Drafts and summarizes emails.</span></div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="mod-gmail" onchange="toggleModule('gmail', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="module-row" id="mod-row-calendar">
+        <div class="module-emoji">📅</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 4: Google Calendar + Lista de compras</span><span data-lang-en>Module 4: Google Calendar + Shopping list</span></div>
+          <div class="module-desc"><span data-lang-es>Gestiona eventos y tu lista de compras.</span><span data-lang-en>Manages events and your shopping list.</span></div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="mod-calendar" onchange="toggleModule('calendar', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="module-row" id="mod-row-ghost">
+        <div class="module-emoji">👻</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 5: Ghost mode en Telegram</span><span data-lang-en>Module 5: Telegram ghost mode</span></div>
+          <div class="module-desc"><span data-lang-es>Lee chats y genera /digest.</span><span data-lang-en>Reads chats and generates /digest.</span></div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="mod-ghost" onchange="toggleModule('ghost', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+      <div class="module-row" id="mod-row-payg0">
+        <div class="module-emoji">💸</div>
+        <div class="module-info">
+          <div class="module-name"><span data-lang-es>Módulo 6: Payg0 — pagos en MXN</span><span data-lang-en>Module 6: Payg0 — MXN payments</span></div>
+          <div class="module-desc"><span data-lang-es>Consulta saldo y envía pagos.</span><span data-lang-en>Check balance and send payments.</span></div>
+        </div>
+        <label class="toggle-switch"><input type="checkbox" id="mod-payg0" onchange="toggleModule('payg0', this.checked)" /><span class="toggle-slider"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       MODULE 1 STEPS
+  ══════════════════════════ -->
+
+  <div class="step" id="step-welcome">
+    <span class="step-emoji">🎉</span>
+    <h2 id="welcome-title">
+      <span data-lang-es>¡Bienvenido a la instalación de Beli!</span>
+      <span data-lang-en>Welcome to the Beli setup!</span>
+    </h2>
+    <p class="step-desc" id="welcome-desc">
+      <span data-lang-es>En los próximos pasos vas a configurar tu asistente personal. Tiempo estimado: ~20 minutos.</span>
+      <span data-lang-en>In the next steps you'll configure your personal assistant. Estimated time: ~20 minutes.</span>
+    </p>
+    <div class="info-box cyan">
+      <strong><span data-lang-es>¿Qué vas a configurar?</span><span data-lang-en>What you'll set up:</span></strong><br>
+      <span data-lang-es>✦ Anthropic API (el cerebro de IA)<br>✦ Telegram Bot (cómo hablar con tu asistente)<br>✦ Groq (transcripción de voz gratis)<br>✦ Repo en GitHub + deploy en Railway</span>
+      <span data-lang-en>✦ Anthropic API (the AI brain)<br>✦ Telegram Bot (how to talk to your assistant)<br>✦ Groq (free voice transcription)<br>✦ GitHub repo + deploy on Railway</span>
+    </div>
+    <div class="info-box green">
+      <span data-lang-es>🔒 Todo corre en tus propias cuentas. Nadie más tiene acceso a tus datos.</span>
+      <span data-lang-en>🔒 Everything runs on your own accounts. Nobody else has access to your data.</span>
+    </div>
+  </div>
+
+  <div class="step" id="step-anthropic">
+    <span class="step-emoji">🔑</span>
+    <h2><span data-lang-es>API key de Anthropic</span><span data-lang-en>Anthropic API key</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Anthropic es la empresa que hace Claude, la IA que le da el cerebro a tu asistente. Necesitas crear una cuenta y obtener una API key.</span>
+      <span data-lang-en>Anthropic is the company behind Claude — the AI that powers your assistant's brain. You need an account and an API key.</span>
+    </p>
+    <div class="info-box orange">
+      <span data-lang-es>💰 Costo: ~$3–8 USD/mes con uso moderado. Pago solo por lo que usas.</span>
+      <span data-lang-en>💰 Cost: ~$3–8 USD/month with moderate use. Pay only for what you use.</span>
+    </div>
+    <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" class="step-link">🔗 <span data-lang-es>Abrir consola de Anthropic</span><span data-lang-en>Open Anthropic console</span></a>
+    <div class="screenshot-placeholder">🔑<span>&lt;!-- TODO: screenshot de consola Anthropic --&gt;</span></div>
+    <div class="field">
+      <label>ANTHROPIC_API_KEY</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-anthropic" placeholder="sk-ant-api03-..." oninput="saveField('anthropic_key', this.value); validateAnthropicKey(this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-anthropic', this)">👁</button>
+      </div>
+      <div id="anthropic-validation" class="validation-msg"></div>
+      <p class="hint"><span data-lang-es>Empieza con "sk-ant-"</span><span data-lang-en>Starts with "sk-ant-"</span></p>
+    </div>
+  </div>
+
+  <div class="step" id="step-telegram-bot">
+    <span class="step-emoji">🤖</span>
+    <h2><span data-lang-es>Token del bot de Telegram</span><span data-lang-en>Telegram Bot token</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Vas a crear un bot en Telegram usando BotFather. Es gratis y toma 2 minutos.</span>
+      <span data-lang-en>You'll create a Telegram bot using BotFather. It's free and takes 2 minutes.</span>
+    </p>
+    <div class="info-box cyan">
+      <strong><span data-lang-es>Pasos exactos:</span><span data-lang-en>Exact steps:</span></strong><br>
+      <span data-lang-es>1. Abre Telegram y busca <code>@BotFather</code><br>2. Envía <code>/newbot</code><br>3. Elige un nombre para el bot (ej: "Mi Beli")<br>4. Elige un username único que termine en "bot"<br>5. BotFather te dará el token — cópialo abajo</span>
+      <span data-lang-en>1. Open Telegram and find <code>@BotFather</code><br>2. Send <code>/newbot</code><br>3. Choose a name (e.g. "My Beli")<br>4. Choose a unique username ending in "bot"<br>5. BotFather gives you the token — paste it below</span>
+    </div>
+    <div class="screenshot-placeholder">🤖<span>&lt;!-- TODO: screenshot conversación con BotFather --&gt;</span></div>
+    <div class="field">
+      <label>TELEGRAM_BOT_TOKEN</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-bot-token" placeholder="1234567890:AAF..." oninput="saveField('bot_token', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-bot-token', this)">👁</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>TELEGRAM_BOT_USERNAME</label>
+      <input type="text" id="input-bot-username" placeholder="mi_beli_bot" oninput="saveField('bot_username', this.value)" />
+      <p class="hint"><span data-lang-es>Sin @. Termina en "bot".</span><span data-lang-en>Without @. Ends in "bot".</span></p>
+    </div>
+  </div>
+
+  <div class="step" id="step-groq">
+    <span class="step-emoji">🎤</span>
+    <h2><span data-lang-es>Groq — Transcripción de voz (GRATIS)</span><span data-lang-en>Groq — Voice transcription (FREE)</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Groq convierte tus notas de voz en texto al instante usando Whisper. Es completamente gratis.</span>
+      <span data-lang-en>Groq converts your voice notes to text instantly using Whisper. It's completely free.</span>
+    </p>
+    <a href="https://console.groq.com" target="_blank" rel="noopener" class="step-link">🔗 <span data-lang-es>Crear cuenta en Groq</span><span data-lang-en>Create Groq account</span></a>
+    <div class="screenshot-placeholder">🎤<span>&lt;!-- TODO: screenshot consola Groq --&gt;</span></div>
+    <div class="field">
+      <label>GROQ_API_KEY <span style="color: var(--text-dim); font-size: 11px; text-transform: none;">(<span data-lang-es>opcional pero recomendado</span><span data-lang-en>optional but recommended</span>)</span></label>
+      <div class="pw-wrap">
+        <input type="password" id="input-groq" placeholder="gsk_..." oninput="saveField('groq_key', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-groq', this)">👁</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" id="step-fork">
+    <span class="step-emoji">🍴</span>
+    <h2><span data-lang-es>Haz un fork del repo</span><span data-lang-en>Fork the repository</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Necesitas tu propia copia del código. Elige la opción que te resulte más cómoda.</span>
+      <span data-lang-en>You need your own copy of the code. Choose whichever option feels more comfortable.</span>
+    </p>
+    <div class="screenshot-placeholder">🍴<span>&lt;!-- TODO: screenshot botón Fork en GitHub --&gt;</span></div>
+    <div class="info-box cyan">
+      <strong>Con Git (terminal):</strong><br>
+      <span data-lang-es>1. Abre <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener">github.com/diegotco/beli</a> y haz clic en "Fork"<br>2. Clona tu fork:</span>
+      <span data-lang-en>1. Open <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener">github.com/diegotco/beli</a> and click "Fork"<br>2. Clone your fork:</span>
+    </div>
+    <div class="cmd"><span>git clone https://github.com/TU-USUARIO/beli.git</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
+    <div class="info-box orange" style="margin-top: 16px;">
+      <strong><span data-lang-es>Con GitHub Desktop (más fácil):</span><span data-lang-en>With GitHub Desktop (easier):</span></strong><br>
+      <span data-lang-es>1. Descarga <a href="https://desktop.github.com" target="_blank" rel="noopener">GitHub Desktop</a><br>2. Haz Fork en el navegador, luego "Open in GitHub Desktop"</span>
+      <span data-lang-en>1. Download <a href="https://desktop.github.com" target="_blank" rel="noopener">GitHub Desktop</a><br>2. Fork in browser, then click "Open in GitHub Desktop"</span>
+    </div>
+  </div>
+
+  <div class="step" id="step-env">
+    <span class="step-emoji">⚙️</span>
+    <h2><span data-lang-es>Tu archivo .env</span><span data-lang-en>Your .env file</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Este es tu archivo .env generado con los datos que ingresaste. Cópialo y guárdalo como <code>.env</code> en la raíz del proyecto.</span>
+      <span data-lang-en>This is your generated .env file with the data you entered. Copy it and save it as <code>.env</code> in the project root.</span>
+    </p>
+    <div class="info-box orange">
+      <span data-lang-es>⚠️ Nunca compartas este archivo ni lo subas a GitHub. Ya está en el .gitignore.</span>
+      <span data-lang-en>⚠️ Never share this file or push it to GitHub. It's already in .gitignore.</span>
+    </div>
+    <div id="env-preview" class="code-block"></div>
+    <button class="copy-btn" onclick="copyEnv(this)"><span data-lang-es>Copiar .env</span><span data-lang-en>Copy .env</span></button>
+    <button class="reveal-btn" id="reveal-btn" onclick="toggleReveal(this)"><span data-lang-es>Mostrar secretos</span><span data-lang-en>Show secrets</span></button>
+  </div>
+
+  <div class="step" id="step-railway">
+    <span class="step-emoji">🚂</span>
+    <h2><span data-lang-es>Deploy en Railway</span><span data-lang-en>Deploy on Railway</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Railway va a correr tu asistente 24/7 en la nube. Cuesta ~$5/mes.</span>
+      <span data-lang-en>Railway will run your assistant 24/7 in the cloud. Costs ~$5/month.</span>
+    </p>
+    <a href="https://railway.app" target="_blank" rel="noopener" class="step-link">🔗 <span data-lang-es>Ir a Railway</span><span data-lang-en>Open Railway</span></a>
+    <div class="info-box cyan">
+      <strong><span data-lang-es>Pasos:</span><span data-lang-en>Steps:</span></strong><br>
+      <span data-lang-es>1. Crea cuenta en railway.app (gratis)<br>2. New Project → Deploy from GitHub repo<br>3. Selecciona tu fork de Beli<br>4. Ve a Variables → agrega cada variable de tu .env<br>5. Railway detecta automáticamente el Procfile y hace el deploy</span>
+      <span data-lang-en>1. Create account at railway.app (free)<br>2. New Project → Deploy from GitHub repo<br>3. Select your Beli fork<br>4. Go to Variables → add each variable from your .env<br>5. Railway auto-detects Procfile and deploys</span>
+    </div>
+    <div class="screenshot-placeholder">🚂<span>&lt;!-- TODO: screenshot panel de Railway --&gt;</span></div>
+    <div class="info-box green">
+      <span data-lang-es>💡 Tip: en Railway puedes pegar todas las variables de una vez en formato KEY=VALUE.</span>
+      <span data-lang-en>💡 Tip: in Railway you can paste all variables at once in KEY=VALUE format.</span>
+    </div>
+  </div>
+
+  <div class="step" id="step-test">
+    <span class="step-emoji">📱</span>
+    <h2 id="test-title">
+      <span data-lang-es>¡Probemos que Beli funciona!</span>
+      <span data-lang-en>Let's test that Beli works!</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Railway tardará 1–2 minutos en hacer el deploy. Cuando el semáforo esté en verde, abre Telegram.</span>
+      <span data-lang-en>Railway will take 1–2 minutes to deploy. When the status is green, open Telegram.</span>
+    </p>
+    <div class="info-box cyan">
+      <span data-lang-es>1. Abre Telegram<br>2. Busca tu bot por username (@tu_bot)<br>3. Envía <code>/start</code><br>4. Deberías recibir un saludo de tu asistente 🎉</span>
+      <span data-lang-en>1. Open Telegram<br>2. Find your bot by username (@your_bot)<br>3. Send <code>/start</code><br>4. You should get a greeting from your assistant 🎉</span>
+    </div>
+    <div class="screenshot-placeholder">📱<span>&lt;!-- TODO: screenshot primera respuesta /start --&gt;</span></div>
+  </div>
+
+  <!-- ══════════════════════════
+       MODULE 2: WHATSAPP
+  ══════════════════════════ -->
+
+  <div class="step" id="step-wa-intro">
+    <span class="step-emoji">👻</span>
+    <h2 id="wa-intro-title">
+      <span data-lang-es>Módulo 2: Ghost mode en WhatsApp</span>
+      <span data-lang-en>Module 2: WhatsApp ghost mode</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Ghost mode significa que tu asistente puede leer y responder mensajes de WhatsApp <strong>como si fueras tú</strong>. Todo corre en tu cuenta — nadie más tiene acceso.</span>
+      <span data-lang-en>Ghost mode means your assistant can read and reply to WhatsApp messages <strong>as if it were you</strong>. Everything runs on your account — nobody else has access.</span>
+    </p>
+    <div class="info-box cyan">
+      <strong><span data-lang-es>¿Qué PUEDE hacer?</span><span data-lang-en>What it CAN do:</span></strong><br>
+      <span data-lang-es>✦ Leer mensajes de WhatsApp<br>✦ Responder en tu nombre cuando le preguntes<br>✦ Resumir conversaciones largas</span>
+      <span data-lang-en>✦ Read WhatsApp messages<br>✦ Reply on your behalf when you ask<br>✦ Summarize long conversations</span>
+    </div>
+    <div class="info-box orange">
+      <strong><span data-lang-es>¿Qué NO hace?</span><span data-lang-en>What it does NOT do:</span></strong><br>
+      <span data-lang-es>✦ No responde automáticamente sin que tú lo pidas<br>✦ No comparte tus mensajes con nadie</span>
+      <span data-lang-en>✦ Does NOT auto-reply without your input<br>✦ Does NOT share your messages with anyone</span>
+    </div>
+    <div class="screenshot-placeholder">📱<span>&lt;!-- TODO: screenshot ghost mode en acción --&gt;</span></div>
+  </div>
+
+  <div class="step" id="step-waha">
+    <span class="step-emoji">🌉</span>
+    <h2><span data-lang-es>Configura WAHA (puente de WhatsApp)</span><span data-lang-en>Set up WAHA (WhatsApp bridge)</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>WAHA es un puente open source que conecta WhatsApp con tu asistente. Se despliega como un servicio separado en Railway.</span>
+      <span data-lang-en>WAHA is an open source bridge connecting WhatsApp to your assistant. It deploys as a separate Railway service.</span>
+    </p>
+    <a href="https://waha.devlike.pro" target="_blank" rel="noopener" class="step-link">🔗 <span data-lang-es>Documentación de WAHA</span><span data-lang-en>WAHA documentation</span></a>
+    <div class="info-box cyan">
+      <span data-lang-es>1. En Railway: New Service → Docker Image → <code>devlikeapro/waha</code><br>2. Copia la URL pública del servicio<br>3. Crea un API key en WAHA Dashboard<br>4. Pega los datos abajo</span>
+      <span data-lang-en>1. In Railway: New Service → Docker Image → <code>devlikeapro/waha</code><br>2. Copy the public URL of the service<br>3. Create an API key in WAHA Dashboard<br>4. Paste data below</span>
+    </div>
+    <div class="field">
+      <label>WAHA_URL</label>
+      <input type="url" id="input-waha-url" placeholder="https://waha.railway.app" oninput="saveField('waha_url', this.value)" />
+    </div>
+    <div class="field">
+      <label>WAHA_SESSION</label>
+      <input type="text" id="input-waha-session" placeholder="default" oninput="saveField('waha_session', this.value)" />
+      <p class="hint"><span data-lang-es>Nombre de sesión, por defecto "default"</span><span data-lang-en>Session name, default is "default"</span></p>
+    </div>
+    <div class="field">
+      <label>WAHA_API_KEY</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-waha-key" placeholder="your-waha-api-key" oninput="saveField('waha_api_key', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-waha-key', this)">👁</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" id="step-tg-creds">
+    <span class="step-emoji">🔑</span>
+    <h2><span data-lang-es>Credenciales de Telegram (MTProto)</span><span data-lang-en>Telegram credentials (MTProto)</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Para el ghost mode necesitas acceso a tu cuenta personal de Telegram, no solo al bot.</span>
+      <span data-lang-en>For ghost mode you need access to your personal Telegram account, not just the bot.</span>
+    </p>
+    <a href="https://my.telegram.org/apps" target="_blank" rel="noopener" class="step-link">🔗 my.telegram.org/apps</a>
+    <div class="info-box cyan">
+      <span data-lang-es>1. Inicia sesión con tu número de teléfono<br>2. Crea una nueva aplicación<br>3. Copia el API ID y el API Hash</span>
+      <span data-lang-en>1. Log in with your phone number<br>2. Create a new application<br>3. Copy the API ID and API Hash</span>
+    </div>
+    <div class="screenshot-placeholder">🔑<span>&lt;!-- TODO: screenshot my.telegram.org --&gt;</span></div>
+    <div class="field">
+      <label>TELEGRAM_API_ID</label>
+      <input type="text" id="input-tg-api-id" placeholder="12345678" oninput="saveField('tg_api_id', this.value)" />
+    </div>
+    <div class="field">
+      <label>TELEGRAM_API_HASH</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-tg-api-hash" placeholder="abc123def456..." oninput="saveField('tg_api_hash', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-tg-api-hash', this)">👁</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" id="step-session-string">
+    <span class="step-emoji">🔐</span>
+    <h2><span data-lang-es>Genera el session string</span><span data-lang-en>Generate the session string</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>El session string permite a Telethon autenticarse como tu cuenta de Telegram.</span>
+      <span data-lang-en>The session string allows Telethon to authenticate as your Telegram account.</span>
+    </p>
+    <div class="info-box cyan">
+      <span data-lang-es>Corre este script en tu computadora (necesitas Python instalado):</span>
+      <span data-lang-en>Run this script on your computer (requires Python):</span>
+    </div>
+    <div class="cmd"><span>python3 generate_session_strings.py</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
+    <div class="info-box orange" style="margin-top: 12px;">
+      <span data-lang-es>El script abrirá un prompt en la terminal. Ingresa tu número de teléfono y el código que recibirás en Telegram.</span>
+      <span data-lang-en>The script will prompt you in the terminal. Enter your phone number and the code you receive in Telegram.</span>
+    </div>
+    <div class="field" style="margin-top: 20px;">
+      <label>OWNER_SESSION_STRING</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-session" placeholder="1BQANOTEuMTgy..." oninput="saveField('session_string', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-session', this)">👁</button>
+      </div>
+      <p class="hint"><span data-lang-es>String largo generado por el script.</span><span data-lang-en>Long string generated by the script.</span></p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       MODULE 3: GMAIL
+  ══════════════════════════ -->
+
+  <div class="step" id="step-gmail-gcp">
+    <span class="step-emoji">☁️</span>
+    <h2><span data-lang-es>Módulo 3: Gmail — Google Cloud Project</span><span data-lang-en>Module 3: Gmail — Google Cloud Project</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Para que tu asistente lea y envíe correos, necesitas habilitar la Gmail API en Google Cloud.</span>
+      <span data-lang-en>For your assistant to read and send emails, you need to enable the Gmail API on Google Cloud.</span>
+    </p>
+    <a href="https://console.cloud.google.com" target="_blank" rel="noopener" class="step-link">🔗 Google Cloud Console</a>
+    <div class="info-box cyan">
+      <span data-lang-es>1. Crea un proyecto nuevo (o usa uno existente)<br>2. Ve a APIs &amp; Services → Library<br>3. Busca "Gmail API" y habilítala<br>4. Ve a OAuth consent screen → configura como "External"</span>
+      <span data-lang-en>1. Create a new project (or use an existing one)<br>2. Go to APIs &amp; Services → Library<br>3. Search "Gmail API" and enable it<br>4. Go to OAuth consent screen → set up as "External"</span>
+    </div>
+    <div class="screenshot-placeholder">☁️<span>&lt;!-- TODO: screenshot Google Cloud Console --&gt;</span></div>
+  </div>
+
+  <div class="step" id="step-gmail-oauth">
+    <span class="step-emoji">🔐</span>
+    <h2><span data-lang-es>Credenciales OAuth de Gmail</span><span data-lang-en>Gmail OAuth credentials</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Crea las credenciales OAuth 2.0 que permiten a tu asistente acceder a Gmail.</span>
+      <span data-lang-en>Create the OAuth 2.0 credentials that allow your assistant to access Gmail.</span>
+    </p>
+    <div class="info-box cyan">
+      <span data-lang-es>1. APIs &amp; Services → Credentials → Create Credentials → OAuth client ID<br>2. Application type: Desktop app<br>3. Descarga el JSON de credenciales<br>4. Guárdalo como <code>google_client_secret.json</code> en la raíz del proyecto</span>
+      <span data-lang-en>1. APIs &amp; Services → Credentials → Create Credentials → OAuth client ID<br>2. Application type: Desktop app<br>3. Download the credentials JSON<br>4. Save as <code>google_client_secret.json</code> in the project root</span>
+    </div>
+  </div>
+
+  <div class="step" id="step-gmail-setup">
+    <span class="step-emoji">🔐</span>
+    <h2><span data-lang-es>Corre el script de Gmail</span><span data-lang-en>Run the Gmail setup script</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Este script abre tu navegador para que autorices el acceso a Gmail.</span>
+      <span data-lang-en>This script opens your browser so you can authorize Gmail access.</span>
+    </p>
+    <div class="cmd"><span>python3 setup_gmail.py</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
+    <div class="screenshot-placeholder">🔐<span>&lt;!-- TODO: screenshot pantalla de consentimiento OAuth --&gt;</span></div>
+    <div class="info-box cyan" style="margin-top: 12px;">
+      <span data-lang-es>El script genera un JSON con tus tokens. Cópialo y pégalo en la variable de abajo.</span>
+      <span data-lang-en>The script generates a JSON with your tokens. Copy it and paste it in the variable below.</span>
+    </div>
+    <div class="field">
+      <label>GMAIL_CREDENTIALS</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-gmail-creds" placeholder='{"token": "...", "refresh_token": "..."}' oninput="saveField('gmail_credentials', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-gmail-creds', this)">👁</button>
+      </div>
+      <p class="hint"><span data-lang-es>El JSON completo generado por setup_gmail.py</span><span data-lang-en>Full JSON generated by setup_gmail.py</span></p>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       MODULE 4: CALENDAR
+  ══════════════════════════ -->
+
+  <div class="step" id="step-cal-enable">
+    <span class="step-emoji">📅</span>
+    <h2><span data-lang-es>Módulo 4: Habilita Calendar y Tasks API</span><span data-lang-en>Module 4: Enable Calendar and Tasks API</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Usa el mismo Google Cloud project que Gmail (o crea uno nuevo).</span>
+      <span data-lang-en>Use the same Google Cloud project as Gmail (or create a new one).</span>
+    </p>
+    <a href="https://console.cloud.google.com" target="_blank" rel="noopener" class="step-link">🔗 Google Cloud Console</a>
+    <div class="info-box cyan">
+      <span data-lang-es>1. APIs &amp; Services → Library<br>2. Busca y habilita "Google Calendar API"<br>3. Busca y habilita "Tasks API"<br>4. Asegúrate de tener las credenciales OAuth configuradas (igual que Gmail)</span>
+      <span data-lang-en>1. APIs &amp; Services → Library<br>2. Search and enable "Google Calendar API"<br>3. Search and enable "Tasks API"<br>4. Make sure OAuth credentials are set up (same as Gmail)</span>
+    </div>
+  </div>
+
+  <div class="step" id="step-cal-setup">
+    <span class="step-emoji">🗓️</span>
+    <h2><span data-lang-es>Corre el script de Calendar</span><span data-lang-en>Run the Calendar setup script</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>Similar al de Gmail, este script autoriza el acceso a Calendar y Tasks.</span>
+      <span data-lang-en>Similar to Gmail, this script authorizes access to Calendar and Tasks.</span>
+    </p>
+    <div class="cmd"><span>python3 setup_google_calendar.py</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
+    <div class="field" style="margin-top: 20px;">
+      <label>GOOGLE_CALENDAR_CREDENTIALS</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-cal-creds" placeholder='{"token": "...", "refresh_token": "..."}' oninput="saveField('calendar_credentials', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-cal-creds', this)">👁</button>
+      </div>
+    </div>
+    <div class="info-box green" style="margin-top: 12px;">
+      <span data-lang-es>Para probarlo después del deploy, dile a tu asistente:<br><code>"¿qué tengo mañana?"</code> o <code>"añade leche a mi lista de compras"</code></span>
+      <span data-lang-en>To test it after deploy, ask your assistant:<br><code>"What do I have tomorrow?"</code> or <code>"Add milk to my shopping list"</code></span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       MODULE 5: GHOST TELEGRAM
+  ══════════════════════════ -->
+
+  <div class="step" id="step-ghost-intro">
+    <span class="step-emoji">👻</span>
+    <h2 id="ghost-intro-title">
+      <span data-lang-es>Módulo 5: Ghost mode en Telegram</span>
+      <span data-lang-en>Module 5: Telegram ghost mode</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Tu asistente puede leer tus chats de Telegram y responder como tú. También habilita el comando <code>/digest</code> para resumir grupos.</span>
+      <span data-lang-en>Your assistant can read your Telegram chats and reply as you. Also enables the <code>/digest</code> command to summarize groups.</span>
+    </p>
+    <div class="info-box cyan" id="ghost-creds-note">
+      <span data-lang-es>Necesitas las mismas credenciales MTProto que en el módulo de WhatsApp (TELEGRAM_API_ID y TELEGRAM_API_HASH). Si ya las ingresaste, están guardadas.</span>
+      <span data-lang-en>You need the same MTProto credentials as the WhatsApp module (TELEGRAM_API_ID and TELEGRAM_API_HASH). If you already entered them, they're saved.</span>
+    </div>
+    <div class="field" id="ghost-api-id-field">
+      <label>TELEGRAM_API_ID</label>
+      <input type="text" id="input-ghost-api-id" placeholder="12345678" oninput="saveField('tg_api_id', this.value)" />
+    </div>
+    <div class="field" id="ghost-api-hash-field">
+      <label>TELEGRAM_API_HASH</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-ghost-api-hash" placeholder="abc123def456..." oninput="saveField('tg_api_hash', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-ghost-api-hash', this)">👁</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" id="step-ghost-session">
+    <span class="step-emoji">🔐</span>
+    <h2><span data-lang-es>Session string de Telegram</span><span data-lang-en>Telegram session string</span></h2>
+    <p class="step-desc" id="ghost-session-desc">
+      <span data-lang-es>Si ya generaste el session string en el módulo de WhatsApp, está guardado. Si no, córrelo ahora.</span>
+      <span data-lang-en>If you already generated the session string in the WhatsApp module, it's saved. If not, run it now.</span>
+    </p>
+    <div class="cmd"><span>python3 generate_session_strings.py</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
+    <div class="field" style="margin-top: 16px;">
+      <label>OWNER_SESSION_STRING</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-ghost-session" placeholder="1BQANOTEuMTgy..." oninput="saveField('session_string', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-ghost-session', this)">👁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       MODULE 6: PAYG0
+  ══════════════════════════ -->
+
+  <div class="step" id="step-payg0-intro">
+    <span class="step-emoji">💸</span>
+    <h2 id="payg0-intro-title">
+      <span data-lang-es>Módulo 6: Payg0 — Pagos en MXN</span>
+      <span data-lang-en>Module 6: Payg0 — MXN Payments</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Payg0 es una plataforma mexicana de pagos. Tu asistente puede consultar tu saldo, ver el historial y hacer pagos desde Telegram.</span>
+      <span data-lang-en>Payg0 is a Mexican payments platform. Your assistant can check your balance, view history, and make payments from Telegram.</span>
+    </p>
+    <a href="https://payg0.io" target="_blank" rel="noopener" class="step-link">🔗 payg0.io</a>
+    <div class="field" style="margin-top: 16px;">
+      <label>PAYG0_API_KEY</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-payg0-key" placeholder="payg0_..." oninput="saveField('payg0_key', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-payg0-key', this)">👁</button>
+      </div>
+      <p class="hint"><span data-lang-es>Encuéntralo en tu dashboard de Payg0.</span><span data-lang-en>Find it in your Payg0 dashboard.</span></p>
+    </div>
+  </div>
+
+  <div class="step" id="step-payg0-webhook">
+    <span class="step-emoji">🔔</span>
+    <h2><span data-lang-es>Webhook de Payg0</span><span data-lang-en>Payg0 Webhook</span></h2>
+    <p class="step-desc">
+      <span data-lang-es>El webhook permite que Payg0 notifique a tu asistente en tiempo real cuando recibes un pago.</span>
+      <span data-lang-en>The webhook lets Payg0 notify your assistant in real time when you receive a payment.</span>
+    </p>
+    <div class="cmd"><span>python3 scripts/get_payg0_webhook_secret.py</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
+    <div class="field" style="margin-top: 16px;">
+      <label>BELI_PUBLIC_URL</label>
+      <input type="url" id="input-public-url" placeholder="https://beli.railway.app" oninput="saveField('public_url', this.value)" />
+      <p class="hint"><span data-lang-es>La URL pública de tu servicio en Railway.</span><span data-lang-en>The public URL of your Railway service.</span></p>
+    </div>
+    <div class="field">
+      <label>PAYG0_WEBHOOK_SECRET</label>
+      <div class="pw-wrap">
+        <input type="password" id="input-payg0-secret" placeholder="whsec_..." oninput="saveField('payg0_webhook_secret', this.value)" />
+        <button class="pw-toggle" onclick="togglePw('input-payg0-secret', this)">👁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       FINAL SUMMARY
+  ══════════════════════════ -->
+
+  <div class="step" id="step-summary">
+    <span class="step-emoji">🎊</span>
+    <h2 id="summary-title">
+      <span data-lang-es>¡Listo! Resumen de tu instalación</span>
+      <span data-lang-en>Done! Your installation summary</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Aquí está todo lo que configuraste.</span>
+      <span data-lang-en>Here's everything you configured.</span>
+    </p>
+
+    <div id="summary-modules"></div>
+
+    <div class="summary-cost">
+      <div class="cost-total" id="cost-estimate">~$8–13 USD</div>
+      <div class="cost-label">
+        <span data-lang-es>Costo estimado por mes</span>
+        <span data-lang-en>Estimated monthly cost</span>
+      </div>
+    </div>
+
+    <div id="final-env-wrap">
+      <h3 style="margin: 20px 0 10px; font-size: 1rem; color: var(--text-muted);">
+        <span data-lang-es>Tu .env completo</span><span data-lang-en>Your complete .env</span>
+      </h3>
+      <div id="final-env" class="code-block"></div>
+      <button class="copy-btn" onclick="copyFinalEnv(this)"><span data-lang-es>Copiar .env completo</span><span data-lang-en>Copy complete .env</span></button>
+      <button class="reveal-btn" id="final-reveal-btn" onclick="toggleReveal(this, true)"><span data-lang-es>Mostrar secretos</span><span data-lang-en>Show secrets</span></button>
+    </div>
+
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px;">
+      <a href="https://b3li.io" class="btn-outline" style="flex:1; min-width: 180px; text-align: center; background: none; border: 1px solid var(--border2); color: var(--text); padding: 12px 20px; border-radius: var(--radius-sm); text-decoration: none; font-weight: 600; transition: all 0.2s; display: block;">
+        <span data-lang-es>← Volver a b3li.io</span>
+        <span data-lang-en>← Back to b3li.io</span>
+      </a>
+      <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener" style="flex:1; min-width: 180px; text-align: center; background: var(--cyan); color: #000; padding: 12px 20px; border-radius: var(--radius-sm); text-decoration: none; font-weight: 700; transition: all 0.2s; display: block;">
+        <span data-lang-es>Ver en GitHub</span>
+        <span data-lang-en>View on GitHub</span>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<!-- NAV BUTTONS -->
+<div id="nav-bar">
+  <button class="nav-btn" id="btn-back" onclick="prevStep()">
+    <span data-lang-es>← Atrás</span>
+    <span data-lang-en>← Back</span>
+  </button>
+  <button class="nav-btn primary" id="btn-next" onclick="nextStep()">
+    <span data-lang-es>Siguiente →</span>
+    <span data-lang-en>Next →</span>
+  </button>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+const DEFAULT_STATE = {
+  lang: 'es',
+  currentStep: 0,
+  name: 'Beli',
+  gender: 'f',
+  modules: { whatsapp: false, gmail: false, calendar: false, ghost: false, payg0: false },
+  fields: {}
+};
+
+let state = JSON.parse(localStorage.getItem('beli-wizard-state') || 'null') || { ...DEFAULT_STATE };
+
+function saveState() {
+  localStorage.setItem('beli-wizard-state', JSON.stringify(state));
+}
+
+function saveField(key, value) {
+  state.fields[key] = value;
+  // Sync duplicate fields
+  if (key === 'tg_api_id') document.querySelectorAll('[id^="input-tg-api-id"], [id^="input-ghost-api-id"]').forEach(el => { if (el.value !== value) el.value = value; });
+  if (key === 'tg_api_hash') document.querySelectorAll('[id^="input-tg-api-hash"], [id^="input-ghost-api-hash"]').forEach(el => { if (el.value !== value) el.value = value; });
+  if (key === 'session_string') document.querySelectorAll('[id^="input-session"], [id^="input-ghost-session"]').forEach(el => { if (el.value !== value) el.value = value; });
+  saveState();
+  updateEnvPreview();
+}
+
+function saveName(val) {
+  state.name = val || 'Beli';
+  saveState();
+  updateNameRefs();
+}
+
+function setGender(g) {
+  state.gender = g;
+  saveState();
+  document.getElementById('btn-masc').classList.toggle('selected', g === 'm');
+  document.getElementById('btn-fem').classList.toggle('selected', g === 'f');
+}
+
+function toggleModule(mod, enabled) {
+  state.modules[mod] = enabled;
+  saveState();
+  const row = document.getElementById('mod-row-' + mod);
+  if (row) row.classList.toggle('enabled', enabled);
+  rebuildSteps();
+}
+
+// ═══════════════════════════════════════════
+// LANGUAGE
+// ═══════════════════════════════════════════
+let currentLang = state.lang || 'es';
+
+function setLang(lang) {
+  currentLang = lang;
+  state.lang = lang;
+  saveState();
+  document.documentElement.lang = lang;
+  if (lang === 'en') {
+    document.body.classList.add('lang-en');
+    document.getElementById('btn-en').classList.add('active');
+    document.getElementById('btn-es').classList.remove('active');
+  } else {
+    document.body.classList.remove('lang-en');
+    document.getElementById('btn-es').classList.add('active');
+    document.getElementById('btn-en').classList.remove('active');
+  }
+}
+
+// ═══════════════════════════════════════════
+// STEPS REGISTRY
+// ═══════════════════════════════════════════
+const FIXED_STEPS = [
+  'step-name',
+  'step-modules',
+  'step-welcome',
+  'step-anthropic',
+  'step-telegram-bot',
+  'step-groq',
+  'step-fork',
+  'step-env',
+  'step-railway',
+  'step-test',
+];
+
+const MODULE_STEPS = {
+  whatsapp: ['step-wa-intro', 'step-waha', 'step-tg-creds', 'step-session-string'],
+  gmail:    ['step-gmail-gcp', 'step-gmail-oauth', 'step-gmail-setup'],
+  calendar: ['step-cal-enable', 'step-cal-setup'],
+  ghost:    ['step-ghost-intro', 'step-ghost-session'],
+  payg0:    ['step-payg0-intro', 'step-payg0-webhook'],
+};
+
+let steps = [];
+let currentStep = 0;
+
+function rebuildSteps() {
+  steps = [...FIXED_STEPS];
+  for (const [mod, enabled] of Object.entries(state.modules)) {
+    if (enabled && MODULE_STEPS[mod]) steps.push(...MODULE_STEPS[mod]);
+  }
+  steps.push('step-summary');
+
+  // Deduplicate shared steps if both whatsapp+ghost are enabled
+  if (state.modules.whatsapp && state.modules.ghost) {
+    // Remove ghost api-id step (it's already in wa), keep ghost session
+    steps = steps.filter(s => s !== 'step-ghost-intro' || !state.modules.whatsapp);
+  }
+
+  const total = steps.length;
+  document.getElementById('step-total').textContent = total;
+  document.getElementById('step-total-en').textContent = total;
+
+  // Ensure currentStep is in range
+  if (currentStep >= steps.length) currentStep = steps.length - 1;
+  showStep(currentStep);
+}
+
+function showStep(idx) {
+  currentStep = idx;
+  state.currentStep = idx;
+  saveState();
+
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const stepId = steps[idx];
+  const el = document.getElementById(stepId);
+  if (el) el.classList.add('active');
+
+  // Progress
+  const pct = steps.length > 1 ? (idx / (steps.length - 1)) * 100 : 0;
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('step-num').textContent = idx + 1;
+  document.getElementById('step-num-en').textContent = idx + 1;
+
+  // Nav buttons
+  document.getElementById('btn-back').disabled = idx === 0;
+  const isLast = idx === steps.length - 1;
+  const nextBtn = document.getElementById('btn-next');
+  if (isLast) {
+    nextBtn.textContent = currentLang === 'es' ? '¡Listo! 🎉' : 'Done! 🎉';
+    nextBtn.disabled = true;
+  } else {
+    nextBtn.innerHTML = currentLang === 'es'
+      ? '<span data-lang-es>Siguiente →</span><span data-lang-en style="display:none">Next →</span>'
+      : '<span data-lang-es style="display:none">Siguiente →</span><span data-lang-en>Next →</span>';
+    nextBtn.disabled = false;
+  }
+
+  // Special step logic
+  if (stepId === 'step-env') updateEnvPreview();
+  if (stepId === 'step-summary') renderSummary();
+  updateNameRefs();
+}
+
+function nextStep() { if (currentStep < steps.length - 1) showStep(currentStep + 1); }
+function prevStep() { if (currentStep > 0) showStep(currentStep - 1); }
+
+// ═══════════════════════════════════════════
+// NAME REFS
+// ═══════════════════════════════════════════
+function updateNameRefs() {
+  const n = state.name || 'Beli';
+  document.querySelectorAll('.assistant-name').forEach(el => el.textContent = n);
+}
+
+// ═══════════════════════════════════════════
+// ENV GENERATION
+// ═══════════════════════════════════════════
+let envRevealed = false;
+let finalEnvRevealed = false;
+
+function mask(val) { return val ? '•'.repeat(Math.min(val.length, 20)) : ''; }
+function mval(key, revealed) {
+  const v = state.fields[key] || '';
+  return revealed ? v : (v ? mask(v) : '');
+}
+
+function buildEnvText(revealed) {
+  const f = state.fields;
+  const n = state.name || 'Beli';
+  let env = `# Generated by Beli Setup Wizard\n# https://b3li.io\n\n`;
+  env += `# ── ASSISTANT ──\n`;
+  env += `ASSISTANT_NAME=${n}\n\n`;
+  env += `# ── MODULE 1: CORE ──\n`;
+  env += `ANTHROPIC_API_KEY=${mval('anthropic_key', revealed)}\n`;
+  env += `TELEGRAM_BOT_TOKEN=${mval('bot_token', revealed)}\n`;
+  env += `TELEGRAM_BOT_USERNAME=${f.bot_username || ''}\n`;
+  if (f.groq_key) env += `GROQ_API_KEY=${mval('groq_key', revealed)}\n`;
+  env += `\n`;
+
+  if (state.modules.whatsapp) {
+    env += `# ── MODULE 2: WHATSAPP ──\n`;
+    env += `WAHA_URL=${f.waha_url || ''}\n`;
+    env += `WAHA_SESSION=${f.waha_session || 'default'}\n`;
+    env += `WAHA_API_KEY=${mval('waha_api_key', revealed)}\n`;
+    env += `TELEGRAM_API_ID=${f.tg_api_id || ''}\n`;
+    env += `TELEGRAM_API_HASH=${mval('tg_api_hash', revealed)}\n`;
+    env += `OWNER_SESSION_STRING=${mval('session_string', revealed)}\n`;
+    env += `\n`;
+  }
+
+  if (state.modules.gmail) {
+    env += `# ── MODULE 3: GMAIL ──\n`;
+    env += `GMAIL_CREDENTIALS=${mval('gmail_credentials', revealed)}\n\n`;
+  }
+
+  if (state.modules.calendar) {
+    env += `# ── MODULE 4: CALENDAR + TASKS ──\n`;
+    env += `GOOGLE_CALENDAR_CREDENTIALS=${mval('calendar_credentials', revealed)}\n\n`;
+  }
+
+  if (state.modules.ghost && !state.modules.whatsapp) {
+    env += `# ── MODULE 5: GHOST TELEGRAM ──\n`;
+    env += `TELEGRAM_API_ID=${f.tg_api_id || ''}\n`;
+    env += `TELEGRAM_API_HASH=${mval('tg_api_hash', revealed)}\n`;
+    env += `OWNER_SESSION_STRING=${mval('session_string', revealed)}\n\n`;
+  }
+
+  if (state.modules.payg0) {
+    env += `# ── MODULE 6: PAYG0 ──\n`;
+    env += `PAYG0_API_KEY=${mval('payg0_key', revealed)}\n`;
+    if (f.public_url) env += `BELI_PUBLIC_URL=${f.public_url}\n`;
+    env += `PAYG0_WEBHOOK_SECRET=${mval('payg0_webhook_secret', revealed)}\n\n`;
+  }
+
+  return env.trimEnd();
+}
+
+function updateEnvPreview() {
+  const el = document.getElementById('env-preview');
+  if (!el) return;
+  el.textContent = buildEnvText(envRevealed);
+}
+
+function toggleReveal(btn, isFinal) {
+  if (isFinal) {
+    finalEnvRevealed = !finalEnvRevealed;
+    document.getElementById('final-env').textContent = buildEnvText(finalEnvRevealed);
+    btn.textContent = finalEnvRevealed
+      ? (currentLang === 'es' ? 'Ocultar secretos' : 'Hide secrets')
+      : (currentLang === 'es' ? 'Mostrar secretos' : 'Show secrets');
+  } else {
+    envRevealed = !envRevealed;
+    updateEnvPreview();
+    btn.textContent = envRevealed
+      ? (currentLang === 'es' ? 'Ocultar secretos' : 'Hide secrets')
+      : (currentLang === 'es' ? 'Mostrar secretos' : 'Show secrets');
+  }
+}
+
+function copyEnv(btn) {
+  navigator.clipboard.writeText(buildEnvText(true)).then(() => {
+    const orig = btn.innerHTML;
+    btn.textContent = currentLang === 'es' ? '¡Copiado!' : 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+function copyFinalEnv(btn) {
+  navigator.clipboard.writeText(buildEnvText(true)).then(() => {
+    btn.textContent = currentLang === 'es' ? '¡Copiado!' : 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ═══════════════════════════════════════════
+// SUMMARY
+// ═══════════════════════════════════════════
+function renderSummary() {
+  const n = state.name || 'Beli';
+  const modsWrap = document.getElementById('summary-modules');
+  const activeModules = [
+    { key: 'core',      emoji: '✅', es: 'Lo indispensable (Telegram + IA)', en: 'Essentials (Telegram + AI)' },
+    { key: 'whatsapp',  emoji: '📱', es: 'WhatsApp ghost mode', en: 'WhatsApp ghost mode' },
+    { key: 'gmail',     emoji: '📧', es: 'Gmail', en: 'Gmail' },
+    { key: 'calendar',  emoji: '📅', es: 'Google Calendar + Lista de compras', en: 'Google Calendar + Shopping list' },
+    { key: 'ghost',     emoji: '👻', es: 'Ghost mode en Telegram', en: 'Telegram ghost mode' },
+    { key: 'payg0',     emoji: '💸', es: 'Payg0 — pagos en MXN', en: 'Payg0 — MXN payments' },
+  ];
+
+  let html = '';
+  for (const m of activeModules) {
+    const active = m.key === 'core' || state.modules[m.key];
+    if (!active) continue;
+    html += `<div class="summary-module">
+      <span class="check">${m.emoji}</span>
+      <span data-lang-es>${m.es}</span><span data-lang-en>${m.en}</span>
+    </div>`;
+  }
+  modsWrap.innerHTML = html;
+
+  // Cost estimate
+  let min = 8, max = 13;
+  if (state.modules.whatsapp) { min += 0; max += 5; }
+  document.getElementById('cost-estimate').textContent = `~$${min}–${max} USD`;
+
+  // Final env
+  document.getElementById('final-env').textContent = buildEnvText(finalEnvRevealed);
+
+  // Reapply lang
+  setLang(currentLang);
+}
+
+// ═══════════════════════════════════════════
+// UTILITIES
+// ═══════════════════════════════════════════
+function validateAnthropicKey(val) {
+  const el = document.getElementById('anthropic-validation');
+  if (!val) { el.textContent = ''; return; }
+  if (val.startsWith('sk-ant-')) {
+    el.textContent = currentLang === 'es' ? '✅ Formato correcto' : '✅ Correct format';
+    el.className = 'validation-msg ok';
+  } else {
+    el.textContent = currentLang === 'es' ? '⚠️ Debe empezar con "sk-ant-"' : '⚠️ Must start with "sk-ant-"';
+    el.className = 'validation-msg err';
+  }
+}
+
+function togglePw(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+  else { input.type = 'password'; btn.textContent = '👁'; }
+}
+
+function copyCmd(btn) {
+  const text = btn.previousElementSibling.textContent.trim();
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+  });
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+function init() {
+  // Restore language
+  setLang(state.lang || 'es');
+
+  // Restore name
+  const nameInput = document.getElementById('input-name');
+  if (nameInput) nameInput.value = state.name || '';
+
+  // Restore gender
+  if (state.gender) {
+    document.getElementById('btn-masc').classList.toggle('selected', state.gender === 'm');
+    document.getElementById('btn-fem').classList.toggle('selected', state.gender === 'f');
+  }
+
+  // Restore module toggles
+  for (const [mod, enabled] of Object.entries(state.modules)) {
+    const el = document.getElementById('mod-' + mod);
+    if (el) el.checked = enabled;
+    const row = document.getElementById('mod-row-' + mod);
+    if (row) row.classList.toggle('enabled', enabled);
+  }
+
+  // Restore field values
+  const fieldMap = {
+    'anthropic_key': 'input-anthropic',
+    'bot_token': 'input-bot-token',
+    'bot_username': 'input-bot-username',
+    'groq_key': 'input-groq',
+    'waha_url': 'input-waha-url',
+    'waha_session': 'input-waha-session',
+    'waha_api_key': 'input-waha-key',
+    'tg_api_id': ['input-tg-api-id', 'input-ghost-api-id'],
+    'tg_api_hash': ['input-tg-api-hash', 'input-ghost-api-hash'],
+    'session_string': ['input-session', 'input-ghost-session'],
+    'gmail_credentials': 'input-gmail-creds',
+    'calendar_credentials': 'input-cal-creds',
+    'payg0_key': 'input-payg0-key',
+    'public_url': 'input-public-url',
+    'payg0_webhook_secret': 'input-payg0-secret',
+  };
+
+  for (const [key, ids] of Object.entries(fieldMap)) {
+    const val = state.fields[key] || '';
+    if (!val) continue;
+    const idList = Array.isArray(ids) ? ids : [ids];
+    for (const id of idList) {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    }
+  }
+
+  rebuildSteps();
+  showStep(state.currentStep || 0);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
