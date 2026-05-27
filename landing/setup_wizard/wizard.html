@@ -199,13 +199,6 @@
     .info-box.green { background: rgba(0,230,118,0.07); border: 1px solid rgba(0,230,118,0.2); color: #a5d6a7; }
     .info-box.orange { background: rgba(255,171,64,0.08); border: 1px solid rgba(255,171,64,0.2); color: #ffe0b2; }
 
-    /* ── PLACEHOLDER IMAGE ── */
-    .screenshot-placeholder {
-      background: var(--bg-card); border: 2px dashed var(--border2);
-      border-radius: var(--radius); padding: 32px; text-align: center;
-      color: var(--text-dim); font-size: 2rem; margin: 16px 0;
-    }
-    .screenshot-placeholder span { display: block; font-size: 13px; margin-top: 8px; font-family: monospace; }
 
     /* ── COMMANDS ── */
     .cmd {
@@ -438,7 +431,7 @@
       <span data-lang-en>💰 Cost: ~$3–8 USD/month with moderate use. Pay only for what you use.</span>
     </div>
     <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener" class="step-link">🔗 <span data-lang-es>Abrir consola de Anthropic</span><span data-lang-en>Open Anthropic console</span></a>
-    <div class="screenshot-placeholder">🔑<span>&lt;!-- TODO: screenshot de consola Anthropic --&gt;</span></div>
+
     <div class="field">
       <label>ANTHROPIC_API_KEY</label>
       <div class="pw-wrap">
@@ -462,7 +455,7 @@
       <span data-lang-es>1. Abre Telegram y busca <code>@BotFather</code><br>2. Envía <code>/newbot</code><br>3. Elige un nombre para el bot (ej: "Mi Beli")<br>4. Elige un username único que termine en "bot"<br>5. BotFather te dará el token — cópialo abajo</span>
       <span data-lang-en>1. Open Telegram and find <code>@BotFather</code><br>2. Send <code>/newbot</code><br>3. Choose a name (e.g. "My Beli")<br>4. Choose a unique username ending in "bot"<br>5. BotFather gives you the token — paste it below</span>
     </div>
-    <div class="screenshot-placeholder">🤖<span>&lt;!-- TODO: screenshot conversación con BotFather --&gt;</span></div>
+
     <div class="field">
       <label>TELEGRAM_BOT_TOKEN</label>
       <div class="pw-wrap">
@@ -485,7 +478,7 @@
       <span data-lang-en>Groq converts your voice notes to text instantly using Whisper. It's completely free.</span>
     </p>
     <a href="https://console.groq.com" target="_blank" rel="noopener" class="step-link">🔗 <span data-lang-es>Crear cuenta en Groq</span><span data-lang-en>Create Groq account</span></a>
-    <div class="screenshot-placeholder">🎤<span>&lt;!-- TODO: screenshot consola Groq --&gt;</span></div>
+
     <div class="field">
       <label>GROQ_API_KEY <span style="color: var(--text-dim); font-size: 11px; text-transform: none;">(<span data-lang-es>opcional pero recomendado</span><span data-lang-en>optional but recommended</span>)</span></label>
       <div class="pw-wrap">
@@ -502,7 +495,7 @@
       <span data-lang-es>Necesitas tu propia copia del código. Elige la opción que te resulte más cómoda.</span>
       <span data-lang-en>You need your own copy of the code. Choose whichever option feels more comfortable.</span>
     </p>
-    <div class="screenshot-placeholder">🍴<span>&lt;!-- TODO: screenshot botón Fork en GitHub --&gt;</span></div>
+
     <div class="info-box cyan">
       <strong>Con Git (terminal):</strong><br>
       <span data-lang-es>1. Abre <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener">github.com/diegotco/beli</a> y haz clic en "Fork"<br>2. Clona tu fork:</span>
@@ -545,7 +538,7 @@
       <span data-lang-es>1. Crea cuenta en railway.app (gratis)<br>2. New Project → Deploy from GitHub repo<br>3. Selecciona tu fork de Beli<br>4. Ve a Variables → agrega cada variable de tu .env<br>5. Railway detecta automáticamente el Procfile y hace el deploy</span>
       <span data-lang-en>1. Create account at railway.app (free)<br>2. New Project → Deploy from GitHub repo<br>3. Select your Beli fork<br>4. Go to Variables → add each variable from your .env<br>5. Railway auto-detects Procfile and deploys</span>
     </div>
-    <div class="screenshot-placeholder">🚂<span>&lt;!-- TODO: screenshot panel de Railway --&gt;</span></div>
+
     <div class="info-box green">
       <span data-lang-es>💡 Tip: en Railway puedes pegar todas las variables de una vez en formato KEY=VALUE.</span>
       <span data-lang-en>💡 Tip: in Railway you can paste all variables at once in KEY=VALUE format.</span>
@@ -566,7 +559,7 @@
       <span data-lang-es>1. Abre Telegram<br>2. Busca tu bot por username (@tu_bot)<br>3. Envía <code>/start</code><br>4. Deberías recibir un saludo de tu asistente 🎉</span>
       <span data-lang-en>1. Open Telegram<br>2. Find your bot by username (@your_bot)<br>3. Send <code>/start</code><br>4. You should get a greeting from your assistant 🎉</span>
     </div>
-    <div class="screenshot-placeholder">📱<span>&lt;!-- TODO: screenshot primera respuesta /start --&gt;</span></div>
+
   </div>
 
   <!-- ══════════════════════════
@@ -593,7 +586,7 @@
       <span data-lang-es>✦ No responde automáticamente sin que tú lo pidas<br>✦ No comparte tus mensajes con nadie</span>
       <span data-lang-en>✦ Does NOT auto-reply without your input<br>✦ Does NOT share your messages with anyone</span>
     </div>
-    <div class="screenshot-placeholder">📱<span>&lt;!-- TODO: screenshot ghost mode en acción --&gt;</span></div>
+
   </div>
 
   <div class="step" id="step-waha">
@@ -638,7 +631,7 @@
       <span data-lang-es>1. Inicia sesión con tu número de teléfono<br>2. Crea una nueva aplicación<br>3. Copia el API ID y el API Hash</span>
       <span data-lang-en>1. Log in with your phone number<br>2. Create a new application<br>3. Copy the API ID and API Hash</span>
     </div>
-    <div class="screenshot-placeholder">🔑<span>&lt;!-- TODO: screenshot my.telegram.org --&gt;</span></div>
+
     <div class="field">
       <label>TELEGRAM_API_ID</label>
       <input type="text" id="input-tg-api-id" placeholder="12345678" oninput="saveField('tg_api_id', this.value)" />
@@ -694,7 +687,7 @@
       <span data-lang-es>1. Crea un proyecto nuevo (o usa uno existente)<br>2. Ve a APIs &amp; Services → Library<br>3. Busca "Gmail API" y habilítala<br>4. Ve a OAuth consent screen → configura como "External"</span>
       <span data-lang-en>1. Create a new project (or use an existing one)<br>2. Go to APIs &amp; Services → Library<br>3. Search "Gmail API" and enable it<br>4. Go to OAuth consent screen → set up as "External"</span>
     </div>
-    <div class="screenshot-placeholder">☁️<span>&lt;!-- TODO: screenshot Google Cloud Console --&gt;</span></div>
+
   </div>
 
   <div class="step" id="step-gmail-oauth">
@@ -718,7 +711,7 @@
       <span data-lang-en>This script opens your browser so you can authorize Gmail access.</span>
     </p>
     <div class="cmd"><span>python3 setup_gmail.py</span><button class="cmd-copy" onclick="copyCmd(this)">Copy</button></div>
-    <div class="screenshot-placeholder">🔐<span>&lt;!-- TODO: screenshot pantalla de consentimiento OAuth --&gt;</span></div>
+
     <div class="info-box cyan" style="margin-top: 12px;">
       <span data-lang-es>El script genera un JSON con tus tokens. Cópialo y pégalo en la variable de abajo.</span>
       <span data-lang-en>The script generates a JSON with your tokens. Copy it and paste it in the variable below.</span>
@@ -965,7 +958,7 @@ const DEFAULT_STATE = {
   lang: 'es',
   currentStep: 0,
   name: 'Beli',
-  gender: 'f',
+  gender: 'm',
   modules: { whatsapp: false, gmail: false, calendar: false, ghost: false, payg0: false, agentmail: false },
   fields: {}
 };
