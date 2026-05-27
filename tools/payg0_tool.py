@@ -24,7 +24,7 @@ def payg0_balance(api_key: str) -> str:
         return "No está configurada la API key de Payg0 (PAYG0_API_KEY)."
     try:
         resp = requests.get(
-            f"{_BASE_URL}/api/v1/balance",
+            f"{_BASE_URL}/api/v1/wallet/balance",
             headers=_headers(api_key),
             timeout=_TIMEOUT,
         )
@@ -222,10 +222,10 @@ def payg0_cancel_payment(api_key: str, payment_id: str) -> str:
 
 
 def _get_my_user_id(api_key: str) -> str | None:
-    """Fetches the owner's Payg0 user ID via GET /api/v1/me."""
+    """Fetches the owner's Payg0 user ID via GET /api/v1/auth/me."""
     try:
         resp = requests.get(
-            f"{_BASE_URL}/api/v1/me",
+            f"{_BASE_URL}/api/v1/auth/me",
             headers=_headers(api_key),
             timeout=_TIMEOUT,
         )
