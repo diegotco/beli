@@ -7,11 +7,11 @@
 
 > Beli lives in Telegram and manages your WhatsApp, Gmail, Google Calendar, shopping lists,
 > group summaries, voice notes, payments, and more.
-> **Open source. Runs on your own accounts. Costs ~$8–18/month.**
+> **Free and open source. Runs on your own accounts. ~$8–18/month for third-party services.**
 
 ---
 
-*¿Hablas español? Lee esta guía en [b3li.io](https://b3li.io)*
+*¿Hablas español? Visita [b3li.io](https://b3li.io)*
 
 ---
 
@@ -25,7 +25,7 @@
 - 🎤 **Transcribe voice notes** instantly with Groq/Whisper (free)
 - 👥 **Summarize Telegram group conversations** with `/digest`
 - 🧠 **Learn about you** and remember what matters over time
-- ✉️ **Has its own email address** via AgentMail (beli@agentmail.to)
+- ✉️ **Give your agent its own email address** via AgentMail
 - 🐦 **Monitor and post on X/Twitter** — mentions, likes, tweets
 - 💸 **Manage Payg0 payments** (MXN) — balance, history, transfers
 
@@ -64,20 +64,20 @@ Everything runs on **your own accounts**. You control all data.
 |---|---|---|
 | 🚂 Railway | 24/7 cloud hosting | ~$5 |
 | 🤖 Anthropic (Claude API) | AI brain | ~$3–8 |
+| 📱 WAHA | WhatsApp bridge (self-hosted Docker) | ~$0–5 |
+| ✉️ AgentMail | Your agent's own email address | $0–5 |
+| 💬 OpenAI (GPT-4o) | Optional chat router | Variable |
 | ✈️ Telegram Bot API | Main interface (BotFather) | Free |
 | 👻 Telegram MTProto (Telethon) | Ghost mode + /digest | Free |
 | 🎤 Groq (Whisper) | Voice note transcription | Free |
-| ✉️ AgentMail | Beli's own email address | $0–5 |
-| 📱 WAHA | WhatsApp bridge (self-hosted Docker) | ~$0–5 |
 | 📅 Google Calendar API | Calendar management (OAuth) | Free |
 | 📧 Gmail API | Read/send emails (OAuth) | Free |
 | ✅ Google Tasks API | Shopping list (same OAuth as Calendar) | Free |
-| 💬 OpenAI (GPT-4o) | Optional chat router | Variable |
 | 🐦 X/Twitter API v2 | Monitor mentions/likes, post tweets | Free (DMs $100/mo) |
 | 💸 Payg0 | MXN payments platform | Free |
 | 🐙 GitHub | Source control + health check Actions | Free |
 
-> With moderate use (~50 msgs/day) the real cost is **~$8/month**.
+> With moderate use (~50 msgs/day) the real cost is **~$8–18/month**.
 
 ---
 
@@ -107,14 +107,15 @@ For full setup instructions see [`SETUP.md`](SETUP.md) and [`SERVICES.md`](SERVI
 
 ## 🧩 Optional Modules
 
-| Module | What it does | Setup script | Key env vars |
-|---|---|---|---|
-| 📱 WhatsApp | Ghost mode via WAHA bridge | — | `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION` |
-| 📧 Gmail | Read/send emails | `setup_gmail.py` | `GMAIL_CREDENTIALS` |
-| 📅 Google Calendar + Tasks | Events + shopping list | `setup_google_calendar.py` | `GOOGLE_CALENDAR_CREDENTIALS` |
-| 👻 Telegram Ghost Mode | Read chats, `/digest` command | `generate_session_strings.py` | `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `OWNER_SESSION_STRING` |
-| 🐦 X/Twitter | Monitor mentions, post tweets | — | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` |
-| 💸 Payg0 | MXN payments | `scripts/get_payg0_webhook_secret.py` | `PAYG0_API_KEY`, `PAYG0_WEBHOOK_SECRET` |
+| Module | What it does | Key env vars |
+|---|---|---|
+| 📱 WhatsApp | Ghost mode via WAHA bridge | `WAHA_URL`, `WAHA_API_KEY`, `WAHA_SESSION` |
+| 📧 Gmail | Read/send emails | `GMAIL_CREDENTIALS` |
+| 📅 Google Calendar + Tasks | Events + shopping list | `GOOGLE_CALENDAR_CREDENTIALS` |
+| 👻 Telegram Ghost Mode | Read chats, `/digest` command | `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `OWNER_SESSION_STRING` |
+| ✉️ AgentMail | Agent's own email address | `AGENTMAIL_API_KEY`, `AGENTMAIL_INBOX_ID` |
+| 🐦 X/Twitter | Monitor mentions, post tweets | `X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET` |
+| 💸 Payg0 | MXN payments | `PAYG0_API_KEY`, `PAYG0_WEBHOOK_SECRET` |
 
 ---
 
@@ -122,11 +123,9 @@ For full setup instructions see [`SETUP.md`](SETUP.md) and [`SERVICES.md`](SERVI
 
 Not a developer? No problem.
 
-Open ChatGPT, Claude, Grok, or Gemini and paste the setup prompt from **[b3li.io](https://b3li.io)**. An AI will guide you through forking the repo, creating accounts, and deploying to Railway — step by step, with screenshots.
+Use the **interactive setup wizard** at **[b3li.io/setup](https://b3li.io/setup)** — it walks you through each module step by step and generates your `.env` file automatically. Everything runs in your browser; no data is ever sent to any server.
 
 **[→ Get started at b3li.io](https://b3li.io)**
-
-Or use the **interactive setup wizard** — open `setup_wizard/wizard.html` in your browser (or run `python3 -m http.server 8080` in that folder). It walks you through each module and generates your `.env` file automatically. Everything runs locally — no data is ever sent anywhere.
 
 ---
 
@@ -180,15 +179,14 @@ beli/
 ├── setup_beli_telegram.py         # Bot initial config
 ├── generate_session_strings.py    # Generate Telethon session strings
 │
-├── landing/                       # b3li.io landing page
-│   ├── index.html
-│   ├── server.py
+├── landing/                       # b3li.io landing page + setup wizard
+│   ├── index.html                 # Landing page
+│   ├── server.py                  # Flask server (serves / and /setup)
 │   ├── requirements.txt
 │   ├── Dockerfile
-│   └── railway.json
-│
-├── setup_wizard/                  # Interactive setup wizard
-│   └── wizard.html
+│   ├── railway.json
+│   └── setup_wizard/
+│       └── wizard.html            # Interactive setup wizard (b3li.io/setup)
 │
 ├── memory/                        # Persistent memory files
 ├── data/                          # Runtime data
@@ -219,13 +217,15 @@ beli/
 | `WAHA_API_KEY` | WAHA API key | WhatsApp module |
 | `GMAIL_CREDENTIALS` | JSON credentials from setup_gmail.py | Gmail module |
 | `GOOGLE_CALENDAR_CREDENTIALS` | JSON credentials from setup_google_calendar.py | Calendar module |
+| `AGENTMAIL_API_KEY` | AgentMail API key | AgentMail module |
+| `AGENTMAIL_INBOX_ID` | AgentMail inbox email address | AgentMail module |
 | `PAYG0_API_KEY` | Payg0 API key | Payg0 module |
 | `PAYG0_WEBHOOK_SECRET` | Payg0 webhook secret | Payg0 module |
 | `BELI_PUBLIC_URL` | Your Railway service public URL | Webhooks |
-| `X_API_KEY` | X/Twitter API key | Twitter module |
-| `X_API_SECRET` | X/Twitter API secret | Twitter module |
-| `X_ACCESS_TOKEN` | X/Twitter access token | Twitter module |
-| `X_ACCESS_TOKEN_SECRET` | X/Twitter access token secret | Twitter module |
+| `X_API_KEY` | X/Twitter API key | X/Twitter module |
+| `X_API_SECRET` | X/Twitter API secret | X/Twitter module |
+| `X_ACCESS_TOKEN` | X/Twitter access token | X/Twitter module |
+| `X_ACCESS_TOKEN_SECRET` | X/Twitter access token secret | X/Twitter module |
 | `OPENAI_API_KEY` | OpenAI key (optional router fallback) | Optional |
 
 ---
