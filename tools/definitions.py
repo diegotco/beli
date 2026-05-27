@@ -640,6 +640,19 @@ TOOLS = [
         },
     },
     {
+        "name": "payg0_usage",
+        "description": (
+            "Consulta el uso mensual actual de Payg0: cuánto se ha enviado y recibido este mes "
+            "y los límites correspondientes. "
+            "Úsala cuando el dueño quiera saber cuánto ha movido este mes o cuánto le queda de cupo."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+        },
+    },
+    {
         "name": "payg0_cancel_payment",
         "description": (
             "Cancela un pago Payg0 que esté en estado PENDING. "

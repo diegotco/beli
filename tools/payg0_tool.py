@@ -248,6 +248,27 @@ def _get_my_user_id(api_key: str) -> str | None:
         return None
 
 
+def payg0_usage(api_key: str) -> str:
+    """Returns the owner's current Payg0 usage (monthly sent/received amounts and limits)."""
+    if not api_key:
+        return "No está configurada la API key de Payg0 (PAYG0_API_KEY)."
+    try:
+        resp = requests.get(
+            f"{_BASE_URL}/api/v1/usage",
+            headers=_headers(api_key),
+            timeout=_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        logger.info(f"[Payg0] /usage raw: {str(data)[:400]}")
+        return f"Uso Payg0: {data}"
+    except requests.HTTPError as e:
+        return f"Error al consultar uso Payg0: {e.response.status_code} — {e.response.text}"
+    except Exception as e:
+        logger.exception(f"[Payg0] Error getting usage: {e}")
+        return f"Error al consultar uso Payg0: {e}"
+
+
 def payg0_check_tier(api_key: str) -> str:
     """
     Returns the owner's current Payg0 tier, monthly limits, and usage percentages.

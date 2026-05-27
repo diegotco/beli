@@ -29,7 +29,7 @@ ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", 
 TASK_TOOLS = {"add_to_shopping_list", "create_task"}
 
 # Data-read tools — their results are the source of truth for balance/transaction claims
-DATA_TOOLS = {"payg0_balance", "payg0_transactions"}
+DATA_TOOLS = {"payg0_balance", "payg0_transactions", "payg0_usage"}
 
 # Signal returned by every successful tool execution (defined in email_sender,
 # telegram_sender, and whatsapp_sender).  This is the ONLY accepted proof of a completed send.
