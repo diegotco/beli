@@ -57,9 +57,11 @@ _PAYG0_CLAIM_PATTERNS = [
     "últimos pagos",
 ]
 
-# Spanish phrases Claude uses when it (falsely) claims to have sent something
+# Spanish phrases Claude uses when it (falsely) claims to have sent something.
+# IMPORTANT: be specific — overly broad patterns fire during legitimate
+# planning/progress responses and corrupt the retry loop.
 _SUCCESS_CLAIM_PATTERNS = [
-    # singular
+    # singular — clear post-send claims
     "enviado exitosamente",
     "se envió",
     "el correo se envió",
@@ -73,17 +75,10 @@ _SUCCESS_CLAIM_PATTERNS = [
     "lo envié",
     "ya envié",
     "envié exitosamente",
-    # plural / bulk-send forms (common when sending to multiple contacts)
+    # plural — only the unambiguous forms
     "enviados exitosamente",
-    "mensajes enviados",
-    "fueron enviados",
-    "se enviaron",
     "todos recibieron",
     "recibieron el mensaje",
-    "los envié",
-    "ya los envié",
-    # list-item form ("- Enviado" per contact)
-    "- enviado",
 ]
 
 # Phrases Claude uses when it (falsely) claims to have added tasks/shopping items
@@ -287,9 +282,22 @@ class BelisBrain:
                 for p in ["¿confirmas?", "¿confirmas", "¿envío", "¿lo envío", "¿procedo", "¿lo hago"]
             )
 
+            # Log which pattern triggered (helps diagnose false positives)
+            triggered_pattern = next(
+                (p for p in _SUCCESS_CLAIM_PATTERNS if p in final_text.lower()), None
+            )
+            if triggered_pattern:
+                logger.info(
+                    f"Guard candidate — pattern={triggered_pattern!r} "
+                    f"tool_confirmed={tool_confirmed_success} "
+                    f"is_asking_confirmation={is_asking_confirmation} "
+                    f"text[:200]={final_text[:200]!r}"
+                )
+
             if _claims_success(final_text) and not tool_confirmed_success and not is_asking_confirmation:
                 logger.error(
-                    f"HALLUCINATION GUARD fired — final_text[:300]={final_text[:300]!r} "
+                    f"HALLUCINATION GUARD fired — pattern={triggered_pattern!r} "
+                    f"final_text[:300]={final_text[:300]!r} "
                     f"action_tool_results={action_tool_results}"
                 )
                 if action_tool_results:
