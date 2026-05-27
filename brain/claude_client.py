@@ -20,7 +20,7 @@ from tools.executor import execute_tool
 
 logger = logging.getLogger("beli.brain")
 
-MAX_TOOL_ROUNDS = 5  # Safety limit to prevent infinite tool loops
+MAX_TOOL_ROUNDS = 12  # Safety limit to prevent infinite tool loops
 
 # Tools that perform real-world sends — their results are the source of truth
 ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner", "send_gmail_message"}
@@ -388,4 +388,9 @@ class BelisBrain:
 
         # Exceeded tool rounds limit
         logger.error(f"Exceeded max tool rounds ({MAX_TOOL_ROUNDS})")
-        return "La tarea requirió demasiados pasos y no pude completarla. Intenta siendo más específico."
+        # If some sends succeeded, report partial success instead of a generic error
+        if action_tool_results:
+            sent_count = sum(1 for r in action_tool_results if SUCCESS_SIGNAL in r)
+            if sent_count:
+                return f"Completé {sent_count} envío(s) pero la tarea era demasiado larga para terminarla en un solo turno. Pídeme que continúe si quedaron pendientes."
+        return "La tarea requirió demasiados pasos y no pude completarla. Intenta dividirla en partes más pequeñas."
