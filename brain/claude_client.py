@@ -28,12 +28,34 @@ ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", 
 # Tasks tools — tracked separately so we can catch task-related hallucinations
 TASK_TOOLS = {"add_to_shopping_list", "create_task"}
 
+# Data-read tools — their results are the source of truth for balance/transaction claims
+DATA_TOOLS = {"payg0_balance", "payg0_transactions"}
+
 # Signal returned by every successful tool execution (defined in email_sender,
 # telegram_sender, and whatsapp_sender).  This is the ONLY accepted proof of a completed send.
 SUCCESS_SIGNAL = "✓ ENVIADO EXITOSAMENTE"
 
 # Signal prefix returned by add_to_shopping_list on success
 TASK_SUCCESS_SIGNAL = "✓ Agregué"
+
+# Phrases Claude uses when it (falsely) claims to know Payg0 balance/transactions
+_PAYG0_CLAIM_PATTERNS = [
+    "tu saldo",
+    "saldo actual",
+    "saldo en payg0",
+    "saldo es",
+    "saldo de",
+    "tienes $",
+    "tienes mxn",
+    "tu saldo es",
+    "el saldo es",
+    "saldo disponible",
+    "tus transacciones",
+    "tus últimas transacciones",
+    "tu historial",
+    "tus movimientos",
+    "últimos pagos",
+]
 
 # Spanish phrases Claude uses when it (falsely) claims to have sent something
 _SUCCESS_CLAIM_PATTERNS = [
@@ -75,6 +97,12 @@ def _claims_task_success(text: str) -> bool:
     """Returns True if the text claims to have added tasks/shopping items."""
     lower = text.lower()
     return any(p in lower for p in _TASK_CLAIM_PATTERNS)
+
+
+def _claims_payg0_data(text: str) -> bool:
+    """Returns True if the text claims to have Payg0 balance or transaction data."""
+    lower = text.lower()
+    return any(p in lower for p in _PAYG0_CLAIM_PATTERNS)
 
 
 class BelisBrain:
@@ -146,6 +174,7 @@ class BelisBrain:
         # Used by the anti-hallucination guard below.
         action_tool_results: list[str] = []
         task_tool_results:   list[str] = []
+        data_tool_results:   list[str] = []
         _hallucination_retry_done = False  # allow one automatic retry
 
         for round_num in range(MAX_TOOL_ROUNDS):
@@ -204,11 +233,13 @@ class BelisBrain:
                     result = await execute_tool(block.name, block.input)
                     logger.info(f"Tool result: {result}")
 
-                    # Track results from send/task actions for the honesty guard
+                    # Track results from send/task/data actions for the honesty guard
                     if block.name in ACTION_TOOLS:
                         action_tool_results.append(result)
                     if block.name in TASK_TOOLS:
                         task_tool_results.append(result)
+                    if block.name in DATA_TOOLS:
+                        data_tool_results.append(result)
 
                     tool_results.append({
                         "type": "tool_result",
@@ -325,6 +356,33 @@ class BelisBrain:
                     return (
                         "Hubo un problema al agregar los ítems. Por favor intenta de nuevo."
                     )
+
+            # ── Payg0 data anti-hallucination guard ─────────────────────────
+            # Catches cases where Claude states Payg0 balance/transactions
+            # without actually calling payg0_balance or payg0_transactions.
+            if _claims_payg0_data(final_text) and not data_tool_results:
+                logger.error(
+                    f"PAYG0 HALLUCINATION GUARD fired — final_text[:200]={final_text[:200]!r}"
+                )
+                if not _hallucination_retry_done:
+                    _hallucination_retry_done = True
+                    logger.warning(
+                        "PAYG0 HALLUCINATION: claimed balance/transactions without calling tool — injecting retry"
+                    )
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Error interno: respondiste con datos de Payg0 sin llamar al tool. "
+                            "Debes llamar AHORA a payg0_balance o payg0_transactions según lo que se pidió. "
+                            "No respondas con texto, solo ejecuta el tool call."
+                        ),
+                    })
+                    continue  # retry
+                logger.error("PAYG0 HALLUCINATION BLOCKED (2nd attempt): no tool call.")
+                return (
+                    "Hubo un problema al consultar tu saldo de Payg0. Por favor intenta de nuevo."
+                )
 
             return final_text
 
