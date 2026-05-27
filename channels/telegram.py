@@ -556,6 +556,7 @@ class TelegramChannel:
             system_prompt=system,
             history=history,
             new_message=text,
+            max_tokens=4096,
         )
 
         # Save both messages to memory

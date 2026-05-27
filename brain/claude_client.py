@@ -323,9 +323,11 @@ class BelisBrain:
                         messages.append({
                             "role": "user",
                             "content": (
-                                "Error interno: respondiste con texto en lugar de llamar a la herramienta. "
-                                "Debes llamar AHORA al tool correspondiente — no respondas con texto, "
-                                "solo ejecuta el tool call."
+                                "Error: escribiste el resultado sin haber llamado ninguna herramienta. "
+                                "Los envíos NO se realizaron. "
+                                "Debes ejecutar las herramientas ahora, una por una, empezando por el PRIMER contacto. "
+                                "Llama find_telegram_contact o send_as_owner para el primer contacto — "
+                                "no respondas con texto, ejecuta el tool call directamente."
                             ),
                         })
                         continue  # retry — Claude sees the correction
