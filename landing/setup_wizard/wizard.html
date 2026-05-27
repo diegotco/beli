@@ -891,6 +891,89 @@
   </div>
 
   <!-- ══════════════════════════
+       STEP: OWNER PROFILE
+  ══════════════════════════ -->
+  <div class="step" id="step-profile">
+    <span class="step-emoji">🧠</span>
+    <h2>
+      <span data-lang-es>Tu perfil personal</span>
+      <span data-lang-en>Your personal profile</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Este archivo le dice a tu asistente quién eres. Edita la plantilla y descárgala — cuanta más información pongas, mejor te conocerá.</span>
+      <span data-lang-en>This file tells your assistant who you are. Edit the template and download it — the more info you add, the better it will know you.</span>
+    </p>
+    <div class="info-box green">
+      <span data-lang-es>🔒 Ya está en el <code>.gitignore</code> — nunca se sube a GitHub. Guárdalo como <code>owner-profile.md</code> en la raíz del proyecto.</span>
+      <span data-lang-en>🔒 Already in <code>.gitignore</code> — never pushed to GitHub. Save it as <code>owner-profile.md</code> in the project root.</span>
+    </div>
+    <div class="field">
+      <textarea id="input-profile" rows="16" oninput="saveField('profile_md', this.value)" style="font-family: inherit; font-size: 14px; line-height: 1.7;"></textarea>
+    </div>
+    <button class="copy-btn" onclick="downloadFile('owner-profile.md', document.getElementById('input-profile').value)">
+      <span data-lang-es>⬇ Descargar owner-profile.md</span>
+      <span data-lang-en>⬇ Download owner-profile.md</span>
+    </button>
+  </div>
+
+  <!-- ══════════════════════════
+       STEP: CONTACTS
+  ══════════════════════════ -->
+  <div class="step" id="step-contacts">
+    <span class="step-emoji">📇</span>
+    <h2>
+      <span data-lang-es>Tus contactos</span>
+      <span data-lang-en>Your contacts</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Mapeo de apodos a números de teléfono. Tu asistente los usará para encontrar contactos por nombre ("llama a mamá", "escríbele a Carlos").</span>
+      <span data-lang-en>Nickname-to-phone mapping. Your assistant uses this to find contacts by name ("call mom", "message Carlos").</span>
+    </p>
+    <div class="info-box green">
+      <span data-lang-es>🔒 Ya está en el <code>.gitignore</code> — nunca se sube a GitHub. Guárdalo como <code>contacts.json</code> en la raíz del proyecto.</span>
+      <span data-lang-en>🔒 Already in <code>.gitignore</code> — never pushed to GitHub. Save it as <code>contacts.json</code> in the project root.</span>
+    </div>
+    <div class="info-box cyan">
+      <span data-lang-es>Usa el formato <code>"apodo": "+52XXXXXXXXXX"</code>. El número debe incluir el código de país.</span>
+      <span data-lang-en>Use the format <code>"nickname": "+52XXXXXXXXXX"</code>. Numbers must include country code.</span>
+    </div>
+    <div class="field">
+      <textarea id="input-contacts" rows="10" oninput="saveField('contacts_json', this.value); validateContacts(this.value)" style="font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.8;"></textarea>
+      <div id="contacts-validation" class="validation-msg"></div>
+    </div>
+    <button class="copy-btn" onclick="downloadContacts()">
+      <span data-lang-es>⬇ Descargar contacts.json</span>
+      <span data-lang-en>⬇ Download contacts.json</span>
+    </button>
+  </div>
+
+  <!-- ══════════════════════════
+       STEP: REMINDERS
+  ══════════════════════════ -->
+  <div class="step" id="step-reminders">
+    <span class="step-emoji">📌</span>
+    <h2>
+      <span data-lang-es>Recordatorios persistentes</span>
+      <span data-lang-en>Persistent reminders</span>
+    </h2>
+    <p class="step-desc">
+      <span data-lang-es>Cosas que tu asistente debe tener siempre en mente: alergias, eventos importantes, instrucciones especiales. Edita y descarga.</span>
+      <span data-lang-en>Things your assistant should always keep in mind: allergies, important events, special instructions. Edit and download.</span>
+    </p>
+    <div class="info-box green">
+      <span data-lang-es>🔒 Ya está en el <code>.gitignore</code>. Guárdalo como <code>reminders.md</code> en la raíz del proyecto.</span>
+      <span data-lang-en>🔒 Already in <code>.gitignore</code>. Save it as <code>reminders.md</code> in the project root.</span>
+    </div>
+    <div class="field">
+      <textarea id="input-reminders" rows="10" oninput="saveField('reminders_md', this.value)" style="font-family: inherit; font-size: 14px; line-height: 1.7;"></textarea>
+    </div>
+    <button class="copy-btn" onclick="downloadFile('reminders.md', document.getElementById('input-reminders').value)">
+      <span data-lang-es>⬇ Descargar reminders.md</span>
+      <span data-lang-en>⬇ Download reminders.md</span>
+    </button>
+  </div>
+
+  <!-- ══════════════════════════
        FINAL SUMMARY
   ══════════════════════════ -->
 
@@ -924,6 +1007,26 @@
       <button class="reveal-btn" id="final-reveal-btn" onclick="toggleReveal(this, true)"><span data-lang-es>Mostrar secretos</span><span data-lang-en>Show secrets</span></button>
     </div>
 
+    <div class="info-box cyan" style="margin-top: 24px;">
+      <strong><span data-lang-es>📁 Archivos que debes colocar en la raíz del proyecto:</span><span data-lang-en>📁 Files to place in the project root:</span></strong><br>
+      <span data-lang-es>
+        • <code>owner-profile.md</code> — tu perfil personal<br>
+        • <code>contacts.json</code> — tus contactos<br>
+        • <code>reminders.md</code> — tus recordatorios<br>
+        • <code>.env</code> — tus API keys<br>
+        <br>
+        Ninguno de estos se sube a GitHub (todos están en <code>.gitignore</code>).
+      </span>
+      <span data-lang-en>
+        • <code>owner-profile.md</code> — your personal profile<br>
+        • <code>contacts.json</code> — your contacts<br>
+        • <code>reminders.md</code> — your reminders<br>
+        • <code>.env</code> — your API keys<br>
+        <br>
+        None of these are pushed to GitHub (all are in <code>.gitignore</code>).
+      </span>
+    </div>
+
     <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px;">
       <a href="https://b3li.io" class="btn-outline" style="flex:1; min-width: 180px; text-align: center; background: none; border: 1px solid var(--border2); color: var(--text); padding: 12px 20px; border-radius: var(--radius-sm); text-decoration: none; font-weight: 600; transition: all 0.2s; display: block;">
         <span data-lang-es>← Volver a b3li.io</span>
@@ -951,6 +1054,74 @@
 </div>
 
 <script>
+// ═══════════════════════════════════════════
+// FILE TEMPLATES
+// ═══════════════════════════════════════════
+const PROFILE_TEMPLATE = `# Mi perfil
+
+## Información básica
+- **Nombre:**
+- **Ciudad:**
+- **Zona horaria:** America/Mexico_City
+
+## Sobre mí
+-
+
+## Preferencias del asistente
+- **Idioma:** Español
+- **Tono:** Casual
+
+## Notas adicionales
+- `;
+
+const CONTACTS_TEMPLATE = `{
+  "mamá": "+521234567890",
+  "papá": "+521234567891",
+  "trabajo": "+521234567892"
+}`;
+
+const REMINDERS_TEMPLATE = `# Recordatorios
+
+- Ejemplo: revisar correos los lunes por la mañana
+- `;
+
+function downloadFile(filename, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function downloadContacts() {
+  const content = document.getElementById('input-contacts').value;
+  try {
+    JSON.parse(content); // validate before download
+    downloadFile('contacts.json', content);
+  } catch(e) {
+    const el = document.getElementById('contacts-validation');
+    el.textContent = currentLang === 'es' ? '⚠️ JSON inválido — revisa la sintaxis antes de descargar.' : '⚠️ Invalid JSON — fix the syntax before downloading.';
+    el.className = 'validation-msg err';
+  }
+}
+
+function validateContacts(val) {
+  const el = document.getElementById('contacts-validation');
+  if (!el || !val.trim()) { if (el) el.textContent = ''; return; }
+  try {
+    JSON.parse(val);
+    el.textContent = currentLang === 'es' ? '✅ JSON válido' : '✅ Valid JSON';
+    el.className = 'validation-msg ok';
+  } catch(e) {
+    el.textContent = currentLang === 'es' ? '⚠️ JSON inválido' : '⚠️ Invalid JSON';
+    el.className = 'validation-msg err';
+  }
+}
+
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
@@ -1032,6 +1203,9 @@ const FIXED_STEPS = [
   'step-telegram-bot',
   'step-groq',
   'step-fork',
+  'step-profile',
+  'step-contacts',
+  'step-reminders',
   'step-env',
   'step-railway',
   'step-test',
@@ -1345,6 +1519,11 @@ function init() {
     'payg0_key': 'input-payg0-key',
     'public_url': 'input-public-url',
     'payg0_webhook_secret': 'input-payg0-secret',
+    'agentmail_key': 'input-agentmail-key',
+    'agentmail_inbox': 'input-agentmail-inbox',
+    'profile_md': 'input-profile',
+    'contacts_json': 'input-contacts',
+    'reminders_md': 'input-reminders',
   };
 
   for (const [key, ids] of Object.entries(fieldMap)) {
@@ -1356,6 +1535,16 @@ function init() {
       if (el) el.value = val;
     }
   }
+
+  // Pre-fill file templates if user hasn't saved content yet
+  const profileEl = document.getElementById('input-profile');
+  if (profileEl && !state.fields['profile_md']) profileEl.value = PROFILE_TEMPLATE;
+
+  const contactsEl = document.getElementById('input-contacts');
+  if (contactsEl && !state.fields['contacts_json']) contactsEl.value = CONTACTS_TEMPLATE;
+
+  const remindersEl = document.getElementById('input-reminders');
+  if (remindersEl && !state.fields['reminders_md']) remindersEl.value = REMINDERS_TEMPLATE;
 
   rebuildSteps();
   showStep(state.currentStep || 0);
