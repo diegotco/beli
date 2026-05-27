@@ -59,6 +59,7 @@ _PAYG0_CLAIM_PATTERNS = [
 
 # Spanish phrases Claude uses when it (falsely) claims to have sent something
 _SUCCESS_CLAIM_PATTERNS = [
+    # singular
     "enviado exitosamente",
     "se envió",
     "el correo se envió",
@@ -72,6 +73,17 @@ _SUCCESS_CLAIM_PATTERNS = [
     "lo envié",
     "ya envié",
     "envié exitosamente",
+    # plural / bulk-send forms (common when sending to multiple contacts)
+    "enviados exitosamente",
+    "mensajes enviados",
+    "fueron enviados",
+    "se enviaron",
+    "todos recibieron",
+    "recibieron el mensaje",
+    "los envié",
+    "ya los envié",
+    # list-item form ("- Enviado" per contact)
+    "- enviado",
 ]
 
 # Phrases Claude uses when it (falsely) claims to have added tasks/shopping items
