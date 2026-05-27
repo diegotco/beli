@@ -1127,7 +1127,10 @@ function validateContacts(val) {
 // ═══════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════
+const STATE_VERSION = 2; // bump when DEFAULT_STATE structure changes
+
 const DEFAULT_STATE = {
+  version: STATE_VERSION,
   lang: 'es',
   currentStep: 0,
   name: 'Beli',
@@ -1136,7 +1139,9 @@ const DEFAULT_STATE = {
   fields: {}
 };
 
-let state = JSON.parse(localStorage.getItem('beli-wizard-state') || 'null') || { ...DEFAULT_STATE };
+const _saved = JSON.parse(localStorage.getItem('beli-wizard-state') || 'null');
+// Reset to defaults if no saved state or version mismatch
+let state = (_saved && _saved.version === STATE_VERSION) ? _saved : { ...DEFAULT_STATE };
 
 function saveState() {
   localStorage.setItem('beli-wizard-state', JSON.stringify(state));
