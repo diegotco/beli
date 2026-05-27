@@ -20,7 +20,7 @@ from tools.executor import execute_tool
 
 logger = logging.getLogger("beli.brain")
 
-MAX_TOOL_ROUNDS = 12  # Safety limit to prevent infinite tool loops
+MAX_TOOL_ROUNDS = 20  # Safety limit to prevent infinite tool loops
 
 # Tools that perform real-world sends — their results are the source of truth
 ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner", "send_gmail_message"}
