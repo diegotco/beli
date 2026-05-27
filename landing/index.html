@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Beli — Tu asistente de IA personal</title>
+  <meta name="description" content="Beli vive en Telegram y gestiona tu WhatsApp, Gmail, Google Calendar, lista de compras y más. Open source. Corre en tus propias cuentas." />
+  <meta property="og:title" content="Beli — Tu asistente de IA personal" />
+  <meta property="og:description" content="Vive en Telegram. Gestiona tu vida digital." />
+  <meta property="og:url" content="https://b3li.io" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --cyan: #00e5ff;
+      --cyan-dim: #00b8d4;
+      --cyan-glow: rgba(0, 229, 255, 0.15);
+      --bg: #050d12;
+      --bg-card: #0d1a22;
+      --bg-card2: #0a1520;
+      --border: rgba(0, 229, 255, 0.12);
+      --text: #e0f0f5;
+      --text-muted: #7a9bac;
+      --text-dim: #4a6b7a;
+      --green: #00e676;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.5);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    /* ── LANG TOGGLE ── */
+    #lang-toggle {
+      position: fixed;
+      top: 18px;
+      right: 20px;
+      z-index: 999;
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 4px;
+    }
+    #lang-toggle button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.05em;
+    }
+    #lang-toggle button.active {
+      background: var(--cyan);
+      color: #000;
+    }
+
+    /* ── SECTIONS ── */
+    section { padding: 80px 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 120px 20px 80px;
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0,229,255,0.08) 0%, transparent 70%);
+      position: relative;
+      overflow: hidden;
+    }
+    #hero::before {
+      content: '';
+      position: absolute;
+      top: -200px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(0,229,255,0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-content { position: relative; z-index: 1; }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--cyan-glow);
+      border: 1px solid rgba(0,229,255,0.3);
+      color: var(--cyan);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 28px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    h1.hero-title {
+      font-size: clamp(4rem, 14vw, 9rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1;
+      margin-bottom: 8px;
+      background: linear-gradient(135deg, #fff 30%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1.1rem, 3vw, 1.5rem);
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      font-weight: 400;
+    }
+
+    .hero-desc {
+      font-size: clamp(0.95rem, 2vw, 1.1rem);
+      color: var(--text-dim);
+      max-width: 520px;
+      margin: 0 auto 40px;
+      line-height: 1.7;
+    }
+
+    .hero-ctas {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--cyan);
+      color: #000;
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 14px 28px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      transition: all 0.2s;
+      border: none;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-primary:hover { background: #fff; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,229,255,0.3); }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text);
+      font-weight: 600;
+      font-size: 1rem;
+      padding: 14px 28px;
+      border-radius: var(--radius-sm);
+      text-decoration: none;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-secondary:hover { border-color: var(--cyan); color: var(--cyan); transform: translateY(-2px); }
+
+    /* ── SECTION TITLES ── */
+    .section-title {
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 800;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+    .section-sub {
+      color: var(--text-muted);
+      font-size: 1rem;
+      margin-bottom: 48px;
+      max-width: 500px;
+    }
+
+    /* ── FEATURES ── */
+    #features { background: var(--bg-card2); }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 20px;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .feature-card:hover { border-color: rgba(0,229,255,0.3); transform: translateY(-3px); box-shadow: var(--shadow); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-emoji { font-size: 1.8rem; margin-bottom: 10px; display: block; }
+    .feature-title {
+      font-weight: 700;
+      font-size: 0.95rem;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .feature-desc { font-size: 0.875rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ── SERVICES TABLE ── */
+    #services { background: var(--bg); }
+    .services-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 230, 118, 0.08);
+      border: 1px solid rgba(0, 230, 118, 0.25);
+      color: var(--green);
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 32px;
+    }
+    .services-table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    thead tr {
+      background: rgba(0,229,255,0.06);
+    }
+    th {
+      text-align: left;
+      padding: 14px 18px;
+      color: var(--cyan);
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 12px 18px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(0,229,255,0.03); }
+    td:first-child { font-weight: 600; }
+    .cost-free { color: var(--green); font-weight: 600; }
+    .cost-paid { color: var(--cyan); font-weight: 600; }
+    .cost-var { color: #ffab40; font-weight: 600; }
+
+    /* ── FOOTER ── */
+    footer {
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      padding: 32px 20px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.875rem;
+    }
+    footer a { color: var(--text-muted); text-decoration: none; }
+    footer a:hover { color: var(--cyan); }
+
+    /* ── UTILITIES ── */
+    [data-lang-en] { display: none; }
+    .lang-en [data-lang-es] { display: none; }
+    .lang-en [data-lang-en] { display: revert; }
+
+    /* For inline elements */
+    span[data-lang-en] { display: none; }
+    .lang-en span[data-lang-es] { display: none; }
+    .lang-en span[data-lang-en] { display: inline; }
+
+    @media (max-width: 600px) {
+      section { padding: 60px 16px; }
+      .hero-ctas { flex-direction: column; align-items: center; }
+      .btn-primary, .btn-secondary { width: 100%; justify-content: center; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- LANG TOGGLE -->
+  <div id="lang-toggle">
+    <button id="btn-es" class="active" onclick="setLang('es')">ES</button>
+    <button id="btn-en" onclick="setLang('en')">EN</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════
+       SECTION 1 — HERO
+  ════════════════════════════════════════ -->
+  <section id="hero">
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span>✦</span>
+        <span data-lang-es>Open Source · Claude-powered</span>
+        <span data-lang-en>Open Source · Claude-powered</span>
+      </div>
+      <h1 class="hero-title">Beli</h1>
+      <p class="hero-subtitle">
+        <span data-lang-es>Tu asistente de IA personal. Vive en Telegram.</span>
+        <span data-lang-en>Your personal AI assistant. Lives in Telegram.</span>
+      </p>
+      <p class="hero-desc">
+        <span data-lang-es>
+          En <strong style="color: var(--cyan)">11 pasos</strong> tienes tu propio agente de IA listo como asistente personal.
+          Corre en tus propias cuentas. Tus datos son 100% privados.
+          Costo real con uso moderado: <strong style="color: var(--cyan)">~$8–18 USD/mes</strong>.
+        </span>
+        <span data-lang-en>
+          In <strong style="color: var(--cyan)">11 steps</strong> you have your own AI agent ready as a personal assistant.
+          Runs on your own accounts. Your data is 100% private.
+          Real cost with moderate use: <strong style="color: var(--cyan)">~$8–18 USD/month</strong>.
+        </span>
+      </p>
+      <div class="hero-ctas">
+        <a href="/setup" class="btn-primary">
+          <span data-lang-es>Quiero el mío →</span>
+          <span data-lang-en>I want mine →</span>
+        </a>
+        <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener" class="btn-secondary">
+          <span>⭐</span>
+          <span data-lang-es>Ver en GitHub</span>
+          <span data-lang-en>View on GitHub</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       SECTION 2 — FEATURES
+  ════════════════════════════════════════ -->
+  <section id="features">
+    <div class="container">
+      <h2 class="section-title">
+        <span data-lang-es>Lo que hace Beli</span>
+        <span data-lang-en>What Beli can do</span>
+      </h2>
+      <p class="section-sub">
+        <span data-lang-es>Un asistente que vive donde tú vives.</span>
+        <span data-lang-en>An assistant that lives where you live.</span>
+      </p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="feature-emoji">💬</span>
+          <div class="feature-title">
+            <span data-lang-es>Responde tus preguntas</span>
+            <span data-lang-en>Answers your questions</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Desde Telegram, con contexto de tu vida.</span>
+            <span data-lang-en>From Telegram, with context about your life.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">📱</span>
+          <div class="feature-title">
+            <span data-lang-es>Administra WhatsApp</span>
+            <span data-lang-en>Manages your WhatsApp</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Modo fantasma: lee y responde mensajes como si fueras tú.</span>
+            <span data-lang-en>Ghost mode: reads and replies as if it were you.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">📧</span>
+          <div class="feature-title">
+            <span data-lang-es>Gmail inteligente</span>
+            <span data-lang-en>Smart Gmail</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Redacta y resume correos de Gmail.</span>
+            <span data-lang-en>Drafts and summarizes Gmail messages.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">📅</span>
+          <div class="feature-title">
+            <span data-lang-es>Google Calendar</span>
+            <span data-lang-en>Google Calendar</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Gestiona tu calendario con lenguaje natural.</span>
+            <span data-lang-en>Manage your calendar with natural language.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">🛒</span>
+          <div class="feature-title">
+            <span data-lang-es>Lista de compras</span>
+            <span data-lang-en>Shopping list</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Registra y gestiona tu lista de compras.</span>
+            <span data-lang-en>Keeps and manages your shopping list.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">🎤</span>
+          <div class="feature-title">
+            <span data-lang-es>Transcribe notas de voz</span>
+            <span data-lang-en>Transcribes voice notes</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Convierte tus audios en texto al instante con Whisper.</span>
+            <span data-lang-en>Converts your audio to text instantly with Whisper.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">👥</span>
+          <div class="feature-title">
+            <span data-lang-es>Resúmenes de grupos</span>
+            <span data-lang-en>Group summaries</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Resume conversaciones de grupos de Telegram.</span>
+            <span data-lang-en>Summarizes Telegram group conversations.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">🧠</span>
+          <div class="feature-title">
+            <span data-lang-es>Aprende sobre ti</span>
+            <span data-lang-en>Learns about you</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Recuerda lo importante y mejora con el tiempo.</span>
+            <span data-lang-en>Remembers what matters and improves over time.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">✉️</span>
+          <div class="feature-title">
+            <span data-lang-es>Correo propio (AgentMail)</span>
+            <span data-lang-en>Own email address (AgentMail)</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Tiene su propia dirección de correo para recibir emails.</span>
+            <span data-lang-en>Has its own email address to receive messages.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">🐦</span>
+          <div class="feature-title">
+            <span data-lang-es>X / Twitter</span>
+            <span data-lang-en>X / Twitter</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Monitorea menciones y publica tweets.</span>
+            <span data-lang-en>Monitors mentions and posts tweets.</span>
+          </p>
+        </div>
+        <div class="feature-card">
+          <span class="feature-emoji">💸</span>
+          <div class="feature-title">
+            <span data-lang-es>Pagos con Payg0 (MXN)</span>
+            <span data-lang-en>Payg0 payments (MXN)</span>
+          </div>
+          <p class="feature-desc">
+            <span data-lang-es>Consulta saldo, historial y envía pagos en MXN.</span>
+            <span data-lang-en>Check balance, history, and send MXN payments.</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       SECTION 3 — SERVICES & COSTS
+  ════════════════════════════════════════ -->
+  <section id="services">
+    <div class="container">
+      <h2 class="section-title">
+        <span data-lang-es>Servicios y costos</span>
+        <span data-lang-en>Services &amp; Costs</span>
+      </h2>
+      <p class="section-sub">
+        <span data-lang-es>Todo corre en tus propias cuentas. Tú controlas todo.</span>
+        <span data-lang-en>Everything runs on your own accounts. You control everything.</span>
+      </p>
+      <div class="services-note">
+        <span>💡</span>
+        <span data-lang-es>Con uso muy moderado (~50 msgs/día) el costo real es <strong>~$8–18 USD/mes</strong>.</span>
+        <span data-lang-en>With moderate use (~50 msgs/day) the real cost is <strong>~$8–18 USD/month</strong>.</span>
+      </div>
+      <div class="services-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>
+                <span data-lang-es>Servicio</span>
+                <span data-lang-en>Service</span>
+              </th>
+              <th>
+                <span data-lang-es>Para qué</span>
+                <span data-lang-en>Purpose</span>
+              </th>
+              <th>
+                <span data-lang-es>Costo/mes</span>
+                <span data-lang-en>Cost/month</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>🚂 Railway</td>
+              <td>
+                <span data-lang-es>Hosting 24/7 en la nube</span>
+                <span data-lang-en>24/7 cloud hosting</span>
+              </td>
+              <td class="cost-paid">~$5</td>
+            </tr>
+            <tr>
+              <td>🤖 Anthropic (Claude API)</td>
+              <td>
+                <span data-lang-es>Cerebro de IA</span>
+                <span data-lang-en>AI brain</span>
+              </td>
+              <td class="cost-paid">~$3–8</td>
+            </tr>
+            <tr>
+              <td>✈️ Telegram Bot API</td>
+              <td>
+                <span data-lang-es>Interfaz principal (BotFather)</span>
+                <span data-lang-en>Main interface (BotFather)</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>👻 Telegram MTProto (Telethon)</td>
+              <td>
+                <span data-lang-es>Ghost mode + /digest, cuenta personal</span>
+                <span data-lang-en>Ghost mode + /digest, personal account</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>🎤 Groq (Whisper)</td>
+              <td>
+                <span data-lang-es>Transcripción de notas de voz</span>
+                <span data-lang-en>Voice note transcription</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>✉️ AgentMail</td>
+              <td>
+                <span data-lang-es>Correo propio de Beli (beli@agentmail.to)</span>
+                <span data-lang-en>Beli's own email address (beli@agentmail.to)</span>
+              </td>
+              <td class="cost-paid">$0–5</td>
+            </tr>
+            <tr>
+              <td>📱 WAHA</td>
+              <td>
+                <span data-lang-es>Puente de WhatsApp (Docker en Railway)</span>
+                <span data-lang-en>WhatsApp bridge (self-hosted Docker on Railway)</span>
+              </td>
+              <td class="cost-paid">~$0–5</td>
+            </tr>
+            <tr>
+              <td>📅 Google Calendar API</td>
+              <td>
+                <span data-lang-es>Gestión de calendario (OAuth)</span>
+                <span data-lang-en>Calendar management (OAuth)</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>📧 Gmail API</td>
+              <td>
+                <span data-lang-es>Leer y enviar emails (OAuth)</span>
+                <span data-lang-en>Read/send emails (OAuth)</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>✅ Google Tasks API</td>
+              <td>
+                <span data-lang-es>Lista de compras (mismo OAuth que Calendar)</span>
+                <span data-lang-en>Shopping list (same OAuth as Calendar)</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>💬 OpenAI (GPT-4o)</td>
+              <td>
+                <span data-lang-es>Router de chat opcional</span>
+                <span data-lang-en>Optional chat router</span>
+              </td>
+              <td class="cost-var">Variable</td>
+            </tr>
+            <tr>
+              <td>🐦 X/Twitter API v2</td>
+              <td>
+                <span data-lang-es>Monitorear menciones/likes, publicar tweets</span>
+                <span data-lang-en>Monitor mentions/likes, post tweets</span>
+              </td>
+              <td class="cost-free">Gratis (DMs $100/mo)</td>
+            </tr>
+            <tr>
+              <td>💸 Payg0</td>
+              <td>
+                <span data-lang-es>Plataforma de pagos en MXN</span>
+                <span data-lang-en>MXN payments platform</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+            <tr>
+              <td>🐙 GitHub</td>
+              <td>
+                <span data-lang-es>Control de versiones + Actions para health check</span>
+                <span data-lang-en>Source control + health check Actions</span>
+              </td>
+              <td class="cost-free">Gratis</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════ -->
+  <footer>
+    <p>
+      <span data-lang-es>Hecho con ❤️ y Claude Code &nbsp;·&nbsp; Código abierto en <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener">GitHub</a></span>
+      <span data-lang-en>Made with ❤️ and Claude Code &nbsp;·&nbsp; Open source on <a href="https://github.com/diegotco/beli" target="_blank" rel="noopener">GitHub</a></span>
+    </p>
+  </footer>
+
+  <script>
+    // ── Language toggle ──
+    let currentLang = localStorage.getItem('beli-lang') || 'es';
+
+    function setLang(lang) {
+      currentLang = lang;
+      localStorage.setItem('beli-lang', lang);
+      document.documentElement.lang = lang;
+      if (lang === 'en') {
+        document.body.classList.add('lang-en');
+        document.getElementById('btn-en').classList.add('active');
+        document.getElementById('btn-es').classList.remove('active');
+        document.title = 'Beli — Your Personal AI Assistant';
+      } else {
+        document.body.classList.remove('lang-en');
+        document.getElementById('btn-es').classList.add('active');
+        document.getElementById('btn-en').classList.remove('active');
+        document.title = 'Beli — Tu asistente de IA personal';
+      }
+    }
+
+    // Apply saved lang on load
+    setLang(currentLang);
+
+  </script>
+</body>
+</html>
