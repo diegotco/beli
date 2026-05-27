@@ -231,7 +231,18 @@ def _get_my_user_id(api_key: str) -> str | None:
         )
         resp.raise_for_status()
         data = resp.json()
-        return data.get("id") or data.get("userId") or data.get("user_id")
+        logger.info(f"[Payg0] /auth/me response keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
+        logger.info(f"[Payg0] /auth/me raw: {str(data)[:300]}")
+        user_id = (
+            data.get("id")
+            or data.get("userId")
+            or data.get("user_id")
+            or data.get("_id")
+            or data.get("uuid")
+            or (data.get("user", {}) or {}).get("id")
+        )
+        logger.info(f"[Payg0] Extracted user_id: {user_id}")
+        return str(user_id) if user_id is not None else None
     except Exception as e:
         logger.warning(f"[Payg0] Could not fetch user ID: {e}")
         return None
@@ -249,12 +260,17 @@ def payg0_check_tier(api_key: str) -> str:
     if not user_id:
         return "No se pudo obtener el ID de usuario de Payg0 para consultar el tier."
 
+    tier_url = f"{_BASE_URL}/api/v1/users/{user_id}/tier"
+    logger.info(f"[Payg0] Calling tier endpoint: {tier_url}")
     try:
         resp = requests.get(
-            f"{_BASE_URL}/api/v1/users/{user_id}/tier",
+            tier_url,
             headers=_headers(api_key),
             timeout=_TIMEOUT,
         )
+        logger.info(f"[Payg0] Tier response status: {resp.status_code}")
+        if not resp.ok:
+            logger.warning(f"[Payg0] Tier error body: {resp.text[:300]}")
         resp.raise_for_status()
         data = resp.json()
 
@@ -293,7 +309,7 @@ def payg0_check_tier(api_key: str) -> str:
         return "\n".join(lines)
 
     except requests.HTTPError as e:
-        return f"Error al consultar tier Payg0: {e.response.status_code} — {e.response.text}"
+        return f"Error al consultar tier Payg0: {e.response.status_code} — user_id={user_id} — {e.response.text}"
     except Exception as e:
         logger.exception(f"[Payg0] Error checking tier: {e}")
-        return f"Error al consultar tier Payg0: {e}"
+        return f"Error al consultar tier Payg0 (user_id={user_id}): {e}"
