@@ -608,7 +608,11 @@ TOOLS = [
             "properties": {
                 "recipient": {
                     "type": "string",
-                    "description": "@username de Payg0 o correo electrónico del destinatario.",
+                    "description": (
+                        "Usuario de Payg0 (con o sin @, ej: 'juanito' o '@juanito') "
+                        "o correo electrónico del destinatario. "
+                        "El tool agrega el @ internamente si hace falta."
+                    ),
                 },
                 "amount": {
                     "type": "number",

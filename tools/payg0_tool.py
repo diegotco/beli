@@ -95,6 +95,26 @@ def payg0_transactions(api_key: str, limit: int = 10) -> str:
         return f"Error al obtener historial Payg0: {e}"
 
 
+def _normalize_payg0_recipient(recipient: str) -> tuple[str, str]:
+    """
+    Normalizes a Payg0 recipient string.
+
+    Returns (api_value, display_label) where:
+    - api_value   is what gets sent to the Payg0 API  (@username or email)
+    - display_label is safe to include in Telegram messages (no bare @mention)
+
+    Accepts: 'juanito', '@juanito', 'user@email.com'
+    """
+    recipient = recipient.strip()
+    if "@" in recipient and "." in recipient.split("@")[-1]:
+        # Looks like an email address — pass as-is
+        return recipient, recipient
+    # Payg0 username — strip any leading @ then add it back for the API,
+    # but use a plain label for display so Telegram doesn't parse it as a mention.
+    username = recipient.lstrip("@")
+    return f"@{username}", username  # api_value, display_label
+
+
 def payg0_send_payment(
     api_key: str,
     recipient: str,
@@ -106,14 +126,17 @@ def payg0_send_payment(
 
     Args:
         api_key:     Payg0 API key
-        recipient:   @username or email address of the recipient
+        recipient:   Payg0 username (with or without @) or email address
         amount:      Amount in MXN
         description: Optional payment description
     """
     if not api_key:
         return "No está configurada la API key de Payg0 (PAYG0_API_KEY)."
+
+    api_recipient, display_recipient = _normalize_payg0_recipient(recipient)
+
     try:
-        payload: dict = {"recipient": recipient, "amount": amount}
+        payload: dict = {"recipient": api_recipient, "amount": amount}
         if description:
             payload["description"] = description
 
@@ -131,12 +154,13 @@ def payg0_send_payment(
         amount_out = data.get("amount", amount)
         reason    = data.get("reason", "")
 
-        result = f"✓ Pago enviado a {recipient}: ${amount_out} MXN [{status}]"
+        # Use display_recipient (no bare @) so Telegram doesn't parse it as a mention
+        result = f"✓ Pago enviado a {display_recipient}: ${amount_out} MXN [{status}]"
         if reason:
             result += f" — {reason}"
         if tx_id:
             result += f"\nID: {tx_id}"
-        logger.info(f"[Payg0] Payment sent to {recipient}: ${amount_out} MXN (id={tx_id})")
+        logger.info(f"[Payg0] Payment sent to {api_recipient}: ${amount_out} MXN (id={tx_id})")
         return result
 
     except requests.HTTPError as e:
@@ -145,10 +169,10 @@ def payg0_send_payment(
             detail = e.response.json().get("message", e.response.text)
         except Exception:
             detail = str(e)
-        logger.error(f"[Payg0] HTTP error sending payment to {recipient}: {detail}")
+        logger.error(f"[Payg0] HTTP error sending payment to {api_recipient}: {detail}")
         return f"Error al enviar pago Payg0: {detail}"
     except Exception as e:
-        logger.exception(f"[Payg0] Error sending payment to {recipient}: {e}")
+        logger.exception(f"[Payg0] Error sending payment to {api_recipient}: {e}")
         return f"Error al enviar pago Payg0: {e}"
 
 
