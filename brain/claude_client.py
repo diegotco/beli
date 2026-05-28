@@ -84,8 +84,10 @@ _SUCCESS_CLAIM_PATTERNS = [
 
 CALENDAR_SUCCESS_SIGNAL = "✓ Evento"
 
-# Phrases Claude uses when it (falsely) claims to have created/modified a calendar event
+# Phrases Claude uses when it (falsely) claims to have created/modified a calendar event,
+# OR when it wrongly asserts an event already exists based on conversation history alone.
 _CALENDAR_CLAIM_PATTERNS = [
+    # Creation claims
     "agendé",
     "lo agendé",
     "ya agendé",
@@ -102,6 +104,14 @@ _CALENDAR_CLAIM_PATTERNS = [
     "actualicé el evento",
     "modifiqué el evento",
     "eliminé el evento",
+    # "Already exists" claims based on history (not verified via read_calendar_events)
+    "ya tienes ese recordatorio",
+    "ya está agendado",
+    "ya lo tienes agendado",
+    "ya está en tu calendario",
+    "ya lo agendamos",
+    "recordatorio agendado para",
+    "tienes ese evento",
 ]
 
 def _claims_calendar_action(text: str) -> bool:
