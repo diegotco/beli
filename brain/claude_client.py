@@ -24,6 +24,7 @@ MAX_TOOL_ROUNDS = 20  # Safety limit to prevent infinite tool loops
 
 # Tools that perform real-world sends — their results are the source of truth
 ACTION_TOOLS = {"send_telegram_message", "send_email", "send_whatsapp_message", "send_as_owner", "send_gmail_message"}
+CALENDAR_WRITE_TOOLS = {"create_calendar_event", "delete_calendar_event", "update_calendar_event"}
 
 # Tasks tools — tracked separately so we can catch task-related hallucinations
 TASK_TOOLS = {"add_to_shopping_list", "create_task"}
@@ -80,6 +81,32 @@ _SUCCESS_CLAIM_PATTERNS = [
     "todos recibieron",
     "recibieron el mensaje",
 ]
+
+CALENDAR_SUCCESS_SIGNAL = "✓ Evento"
+
+# Phrases Claude uses when it (falsely) claims to have created/modified a calendar event
+_CALENDAR_CLAIM_PATTERNS = [
+    "agendé",
+    "lo agendé",
+    "ya agendé",
+    "agendé el recordatorio",
+    "agendé el evento",
+    "creé el evento",
+    "el evento fue creado",
+    "evento creado",
+    "recordatorio creado",
+    "agregué al calendario",
+    "añadí al calendario",
+    "lo añadí al calendario",
+    "lo agregué al calendario",
+    "actualicé el evento",
+    "modifiqué el evento",
+    "eliminé el evento",
+]
+
+def _claims_calendar_action(text: str) -> bool:
+    lower = text.lower()
+    return any(p in lower for p in _CALENDAR_CLAIM_PATTERNS)
 
 # Phrases Claude uses when it (falsely) claims to have added tasks/shopping items
 _TASK_CLAIM_PATTERNS = [
@@ -179,9 +206,10 @@ class BelisBrain:
 
         # Collect results from action tools called during this turn.
         # Used by the anti-hallucination guard below.
-        action_tool_results: list[str] = []
-        task_tool_results:   list[str] = []
-        data_tool_results:   list[str] = []
+        action_tool_results:   list[str] = []
+        task_tool_results:     list[str] = []
+        data_tool_results:     list[str] = []
+        calendar_tool_results: list[str] = []
         _hallucination_retry_done = False  # allow one automatic retry
 
         for round_num in range(MAX_TOOL_ROUNDS):
@@ -240,13 +268,15 @@ class BelisBrain:
                     result = await execute_tool(block.name, block.input)
                     logger.info(f"Tool result: {result}")
 
-                    # Track results from send/task/data actions for the honesty guard
+                    # Track results from send/task/data/calendar actions for the honesty guard
                     if block.name in ACTION_TOOLS:
                         action_tool_results.append(result)
                     if block.name in TASK_TOOLS:
                         task_tool_results.append(result)
                     if block.name in DATA_TOOLS:
                         data_tool_results.append(result)
+                    if block.name in CALENDAR_WRITE_TOOLS:
+                        calendar_tool_results.append(result)
 
                     tool_results.append({
                         "type": "tool_result",
@@ -378,6 +408,43 @@ class BelisBrain:
                     return (
                         "Hubo un problema al agregar los ítems. Por favor intenta de nuevo."
                     )
+
+            # ── Calendar anti-hallucination guard ───────────────────────────
+            # Catches cases where Claude claims to have created/modified a
+            # calendar event without actually calling create_calendar_event etc.
+            calendar_confirmed = any(CALENDAR_SUCCESS_SIGNAL in r for r in calendar_tool_results)
+
+            if _claims_calendar_action(final_text) and not calendar_confirmed:
+                logger.error(
+                    f"CALENDAR HALLUCINATION GUARD fired — final_text[:200]={final_text[:200]!r} "
+                    f"calendar_tool_results={calendar_tool_results}"
+                )
+                if calendar_tool_results:
+                    last_result = calendar_tool_results[-1]
+                    return (
+                        f"No pude completar la acción en el calendario. Esto reportó el sistema:\n\n"
+                        f"{last_result}"
+                    )
+                else:
+                    if not _hallucination_retry_done:
+                        _hallucination_retry_done = True
+                        logger.warning(
+                            "CALENDAR HALLUCINATION: claimed calendar action without calling tool — injecting retry"
+                        )
+                        messages.append({"role": "assistant", "content": response.content})
+                        messages.append({
+                            "role": "user",
+                            "content": (
+                                "Error: dijiste que agendaste o modificaste un evento pero no llamaste "
+                                "ninguna herramienta de calendario. "
+                                "Debes llamar AHORA a create_calendar_event, update_calendar_event o "
+                                "delete_calendar_event según corresponda. "
+                                "No respondas con texto, ejecuta el tool call directamente."
+                            ),
+                        })
+                        continue  # retry
+                    logger.error("CALENDAR HALLUCINATION BLOCKED (2nd attempt): no tool call.")
+                    return "No pude completar la acción en el calendario. Por favor intenta de nuevo."
 
             # ── Payg0 data anti-hallucination guard ─────────────────────────
             # Catches cases where Claude states Payg0 balance/transactions
