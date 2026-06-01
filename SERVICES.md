@@ -1,104 +1,124 @@
-# Beli — External Services & Cost Estimate
+# Beli — External Services & Cost Reference
 
-This file lists every external service Beli depends on, its purpose, pricing model,
-and an estimated monthly cost based on light personal use (1 user, ~50 messages/day).
+Every external service Beli uses, its purpose, and estimated monthly cost
+based on light personal use (1 user, ~50 messages/day).
 
 ---
 
-## 1. Railway — Cloud Hosting
-**Purpose:** Runs the Beli process 24/7 in the cloud.
-**Plan:** Hobby ($5/month flat + resource usage)
-**Pricing:**
-- $5/month base fee (includes $5 of usage credit)
-- CPU: ~$0.000463/vCPU/minute
-- RAM: ~$0.000231/GB/minute
-- Beli is lightweight — typically stays within the $5 credit
+## Paid services
+
+### 🚂 Railway — Cloud hosting
+**Purpose:** Runs Beli 24/7 in the cloud.
+**Plan:** Hobby ($5/month flat + resource usage). Beli is lightweight and typically stays within the included credit.
 **Estimated cost:** ~$5/month
 **URL:** https://railway.app
 
 ---
 
-## 2. Anthropic — Claude API (Beli's brain)
-**Purpose:** Processes all messages, reads chats, drafts replies, extracts facts.
-**Model in use:** `claude-sonnet-4-5`
-**Pricing (input / output per million tokens):**
-- Input: ~$3.00
-- Output: ~$15.00
-- Each conversation turn ≈ 2,000–5,000 tokens (including system prompt + history)
+### 🤖 Anthropic — Claude API (Beli's brain)
+**Purpose:** Processes all messages, reads chats, drafts replies, extracts memory facts.
+**Model:** `claude-sonnet-4-5` (default). Can be switched to `claude-haiku-4-5` for ~10x lower cost.
+**Pricing:** ~$3/M input tokens, ~$15/M output tokens. Each turn ≈ 2,000–5,000 tokens.
 **Estimated cost:** ~$3–8/month at 50 messages/day
-**Note:** Switching to `claude-haiku-4-5` reduces cost by ~10x at the expense of quality.
 **URL:** https://console.anthropic.com
 
 ---
 
-## 3. Telegram Bot API — Bot interface
-**Purpose:** The @IamBeliBot interface through which the owner chats with Beli.
-**Pricing:** Free — no limits for personal use.
-**URL:** https://core.telegram.org/bots/api
+### 📱 WAHA — WhatsApp bridge (optional)
+**Purpose:** Self-hosted Docker container that bridges WhatsApp to Beli (ghost mode).
+**Deployment:** Docker image on Railway as a separate service.
+**Estimated cost:** ~$0–5/month (depends on Railway resource usage)
+**URL:** https://waha.devlike.pro
 
 ---
 
-## 4. Telegram MTProto (via Telethon) — Personal account access
-**Purpose:** Reads the owner's personal Telegram chats (`/digest`) and sends messages
-as the owner (ghost mode) using the owner's own Telegram session.
-**Pricing:** Free — uses the official Telegram API with personal credentials.
-**Requires:** Telegram API ID + API Hash from https://my.telegram.org/apps
-
----
-
-## 5. Groq — Voice note transcription
-**Purpose:** Transcribes voice messages sent to Beli using OpenAI's Whisper model.
-**Model:** `whisper-large-v3`
-**Pricing:**
-- Free tier: generous free quota for personal use
-- Paid: $0.111/hour of audio (~$0.002/minute)
-**Estimated cost:** ~$0/month (free tier sufficient for personal use)
-**URL:** https://console.groq.com
-
----
-
-## 6. AgentMail — Beli's email inbox
-**Purpose:** Gives Beli a real email address (`beli@agentmail.to`) so she can send
-emails on the owner's behalf.
-**Pricing:** Check current pricing at https://agentmail.to
+### ✉️ AgentMail — Agent's own email (optional)
+**Purpose:** Gives your agent its own email address to receive messages.
 **Estimated cost:** ~$0–5/month depending on plan
 **URL:** https://agentmail.to
 
 ---
 
-## 7. GitHub — Source control + health monitoring
-**Purpose (1):** Hosts the source code repository.
-**Purpose (2):** GitHub Actions runs a health check every 5 minutes that pings
-`/health` on Railway and sends a Telegram alert if Beli goes down.
-**Pricing:** Free for public and private repos (Actions: 2,000 min/month free).
-- Health check workflow uses ~1 min/run × 288 runs/day = ~288 min/day → paid tier needed
-  if the repo is private and usage exceeds the free quota.
-**Estimated cost:** $0/month (public repo) or $4/month (GitHub Pro for private repos)
+### 💬 OpenAI GPT-4o — Chat router (optional)
+**Purpose:** Handles general conversation questions (no tools needed) for faster, cheaper responses. Claude handles all tool-use actions regardless.
+**Estimated cost:** Variable — only used for non-tool messages
+**URL:** https://platform.openai.com
+
+---
+
+## Free services
+
+### ✈️ Telegram Bot API
+**Purpose:** Main interface — the bot the owner chats with.
+**Cost:** Free, no limits for personal use.
+**URL:** https://core.telegram.org/bots/api
+
+---
+
+### 👻 Telegram MTProto (Telethon) — Ghost mode
+**Purpose:** Reads personal Telegram chats and sends messages as the owner. Enables `/digest`.
+**Cost:** Free — uses official Telegram API with personal credentials.
+**Requires:** API ID + Hash from https://my.telegram.org/apps
+
+---
+
+### 🎤 Groq — Voice transcription
+**Purpose:** Transcribes voice notes using Whisper.
+**Model:** `whisper-large-v3`
+**Cost:** Free tier covers hundreds of minutes/month — sufficient for personal use.
+**URL:** https://console.groq.com
+
+---
+
+### 📅 Google Calendar API + ✅ Google Tasks API
+**Purpose:** Read/create calendar events and manage shopping list.
+**Cost:** Free — well within Google's generous personal quotas.
+**Setup note:** OAuth app must be set to **"In production"** (Google Auth Platform → Audience) to prevent tokens from expiring every 7 days.
+**URL:** https://console.cloud.google.com
+
+---
+
+### 📧 Gmail API
+**Purpose:** Read inbox and send emails from the owner's Gmail account.
+**Cost:** Free.
+**Setup note:** Same OAuth app as Calendar — ensure **"In production"** status.
+
+---
+
+### 💸 Payg0 — MXN payments
+**Purpose:** Check balance, view transaction history, send MXN payments from Telegram.
+**Cost:** Free API — Payg0 may charge transaction fees per their platform terms.
+**URL:** https://payg0.io
+
+---
+
+### 🐙 GitHub
+**Purpose:** Source control. Optional: GitHub Actions for health check monitoring.
+**Cost:** Free for public repos.
 **URL:** https://github.com
 
 ---
 
-## Summary — Estimated Monthly Cost
+## Monthly cost summary
 
-| Service         | Cost/month       |
-|-----------------|------------------|
-| Railway         | ~$5.00           |
-| Anthropic API   | ~$3–8.00         |
-| Telegram APIs   | Free             |
-| Groq (Whisper)  | Free             |
-| AgentMail       | ~$0–5.00         |
-| GitHub          | Free             |
-| **Total**       | **~$8–18/month** |
+| Service              | Cost/month   | Required?  |
+|----------------------|--------------|------------|
+| Railway              | ~$5          | ✅ Yes     |
+| Anthropic (Claude)   | ~$3–8        | ✅ Yes     |
+| WAHA (WhatsApp)      | ~$0–5        | Optional   |
+| AgentMail            | ~$0–5        | Optional   |
+| OpenAI (GPT-4o)      | Variable     | Optional   |
+| Everything else      | Free         | —          |
+| **Total**            | **~$8–23**   |            |
 
-> Costs scale with usage. At very low usage (< 20 messages/day) the total can be
-> as low as $5–7/month. At high usage (hundreds of messages/day + many voice notes)
-> it could reach $20–30/month, driven mainly by the Claude API.
+> With only the core module active (Telegram + AI): **~$8–13/month**.
+> With all paid modules active (+ WhatsApp + AgentMail): up to **~$23/month**.
+> Costs scale with usage — very low usage (< 20 msgs/day) can be as low as **$5–7/month**.
 
 ---
 
 ## Reducing costs
 
-- **Swap model:** Change `CLAUDE_MODEL=claude-haiku-4-5-20251001` in Railway to use
-  the cheaper/faster Haiku model (~10x cheaper than Sonnet).
-- **Reduce memory window:** Lower `MEMORY_WINDOW` to send fewer tokens per request.
-- **Voice notes:** Groq's free tier covers hundreds of minutes/month — unlikely to hit limits.
+- **Switch to Haiku:** set `CLAUDE_MODEL=claude-haiku-4-5-20251001` in Railway (~10x cheaper than Sonnet, less capable)
+- **Reduce memory window:** lower `MEMORY_WINDOW` to send fewer tokens per request
+- **Skip optional modules:** only enable the services you actually use
