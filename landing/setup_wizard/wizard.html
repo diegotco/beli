@@ -1455,9 +1455,11 @@ function renderSummary() {
   }
   modsWrap.innerHTML = html;
 
-  // Cost estimate
+  // Cost estimate (base: Railway ~$5 + Anthropic ~$3-8 = $8-13)
   let min = 8, max = 13;
-  if (state.modules.whatsapp) { min += 0; max += 5; }
+  if (state.modules.whatsapp)  { max += 5; }   // WAHA $0–5
+  if (state.modules.agentmail) { max += 5; }   // AgentMail $0–5
+  // Gmail, Calendar, Ghost, Payg0 are free — no adjustment
   document.getElementById('cost-estimate').textContent = `~$${min}–${max} USD`;
 
   // Final env
