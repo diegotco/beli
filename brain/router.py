@@ -51,6 +51,8 @@ _TOOL_RESULT_KEYWORDS = [
     "no hay mensajes", "últimos", "mensajes con", "mensajes de",
     "conversaciones", "chat", "tu agenda", "tu calendario",
     "no pude", "parece que no",
+    # Channel/group summaries
+    "canal", "grupo", "noticias de", "resumen del canal", "últimas horas",
     # Draft confirmation (ghost mode)
     "voy a enviarte", "te voy a enviar esto", "¿lo envío",
 ]
@@ -75,9 +77,12 @@ Your ONLY job is to decide whether the user's message requires calling external 
 
 Tools are needed for:
 - Sending messages (Telegram, WhatsApp, email)
-- Reading chats or inbox
-- Creating, editing, or deleting calendar events
+- Reading, summarizing, or checking chats, channels, groups, or inbox — including phrases like
+  "resúmeme el canal", "qué dijeron en el grupo", "noticias del canal", "mensajes de ayer",
+  "qué pasó en", "resumen del canal", "lee el canal", "revisa el grupo"
+- Creating, editing, or deleting calendar events or reminders
 - Creating, completing, or deleting tasks / shopping list items
+- Checking balance, sending payments (Payg0)
 - Setting timezone or preferences
 - Any X / Twitter action: posting tweets, creating polls, reading mentions, checking tweet stats
 - Any real-world action or data lookup from connected services
