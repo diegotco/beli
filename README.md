@@ -7,7 +7,7 @@
 
 > Beli lives in Telegram and manages your WhatsApp, Gmail, Google Calendar, shopping lists,
 > group summaries, voice notes, payments, and more.
-> **Free and open source. Runs on your own accounts. ~$8–18/month for third-party services.**
+> **Free and open source. Runs on your own accounts. ~$8–23/month for third-party services.**
 
 ---
 
@@ -28,6 +28,29 @@
 - ✉️ **Give your agent its own email address** via AgentMail
 - 🐦 **Monitor and post on X/Twitter** — mentions, likes, tweets
 - 💸 **Manage Payg0 payments** (MXN) — balance, history, transfers
+
+---
+
+## 🛠️ Tech stack
+
+| Layer | Technology |
+|---|---|
+| **Language** | Python 3.11+ |
+| **AI brain** | Anthropic Claude API (Sonnet) |
+| **Chat router** | OpenAI GPT-4o (optional, for general conversation) |
+| **Telegram bot** | python-telegram-bot |
+| **Telegram ghost mode** | Telethon (MTProto) |
+| **Voice transcription** | Groq Whisper |
+| **Google integrations** | google-api-python-client (Calendar, Tasks, Gmail) |
+| **X / Twitter** | Tweepy |
+| **WhatsApp bridge** | WAHA (self-hosted Docker) + requests |
+| **Payments** | Payg0 API + requests |
+| **Agent email** | AgentMail API + requests |
+| **Memory / database** | SQLite via aiosqlite |
+| **Landing page** | HTML + CSS + vanilla JavaScript (no frameworks) |
+| **Landing server** | Flask |
+| **Hosting** | Railway |
+| **Config** | python-dotenv |
 
 ---
 
