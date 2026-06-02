@@ -80,6 +80,10 @@ _SUCCESS_CLAIM_PATTERNS = [
     "enviados exitosamente",
     "todos recibieron",
     "recibieron el mensaje",
+    # short confirmation forms Beli uses as standalone lines
+    "enviado ✓",
+    "mensaje enviado ✓",
+    "listo, enviado",
 ]
 
 CALENDAR_SUCCESS_SIGNAL = "✓ Evento"
