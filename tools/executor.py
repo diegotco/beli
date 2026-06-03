@@ -9,7 +9,7 @@ from tools.telegram_sender import find_telegram_contact, send_as_owner, read_tel
 from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, read_whatsapp_chat_history, edit_whatsapp_message, delete_whatsapp_message, send_whatsapp_image
 from tools.email_sender import send_email
 from tools.payg0_tool import payg0_balance, payg0_transactions, payg0_send_payment, payg0_payment_detail, payg0_cancel_payment, payg0_check_tier, payg0_usage
-from tools.web_tool import web_scrape, web_search
+from tools.web_tool import web_scrape, web_search, web_fill_form
 from tools.calendar_tool import read_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event
 from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
 from tools.tasks_tool import (
@@ -493,6 +493,13 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
             api_key=config.FIRECRAWL_API_KEY,
             query=tool_input.get("query", ""),
             limit=int(tool_input.get("limit", 5)),
+        )
+
+    if tool_name == "web_fill_form":
+        return web_fill_form(
+            api_key=config.FIRECRAWL_API_KEY,
+            url=tool_input.get("url", ""),
+            actions=tool_input.get("actions", []),
         )
 
     logger.warning(f"Unknown tool called: {tool_name}")

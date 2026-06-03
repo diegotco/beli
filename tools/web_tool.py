@@ -1,7 +1,8 @@
 """
-tools/web_tool.py - Web browsing and search for Beli via Firecrawl.
+tools/web_tool.py - Web browsing, search, and form interaction for Beli via Firecrawl.
 
-Firecrawl converts any URL into clean markdown and can search the web.
+Firecrawl converts any URL into clean markdown, can search the web,
+and can interact with pages (click, fill forms, submit).
 API docs: https://docs.firecrawl.dev
 """
 import logging
@@ -25,7 +26,6 @@ def web_scrape(api_key: str, url: str) -> str:
         content = result.markdown or ""
         if not content.strip():
             return f"No pude extraer contenido de {url}. La página puede requerir JavaScript o estar bloqueada."
-        # Trim if too long
         if len(content) > _MAX_CONTENT_CHARS:
             content = content[:_MAX_CONTENT_CHARS] + f"\n\n[...contenido recortado — {len(content)} caracteres en total]"
         title = getattr(result, "metadata", {}) and result.metadata.get("title", "")
@@ -39,7 +39,7 @@ def web_scrape(api_key: str, url: str) -> str:
 def web_search(api_key: str, query: str, limit: int = 5) -> str:
     """
     Searches the web for a query and returns a summary of the top results.
-    Use this when the owner asks about something that requires current or external information.
+    Use this when the owner asks about current events, news, prices, or anything external.
     """
     if not api_key:
         return "No está configurada la API key de Firecrawl (FIRECRAWL_API_KEY)."
@@ -52,9 +52,9 @@ def web_search(api_key: str, query: str, limit: int = 5) -> str:
 
         lines = [f"Resultados de búsqueda para: **{query}**\n"]
         for i, r in enumerate(results, 1):
-            title   = getattr(r, "title", "") or r.get("title", "") if isinstance(r, dict) else getattr(r, "title", "Sin título")
-            url     = getattr(r, "url", "")   or r.get("url", "")   if isinstance(r, dict) else getattr(r, "url", "")
-            snippet = getattr(r, "description", "") or r.get("description", "") if isinstance(r, dict) else getattr(r, "description", "")
+            title   = r.get("title", "Sin título") if isinstance(r, dict) else getattr(r, "title", "Sin título")
+            url     = r.get("url", "")             if isinstance(r, dict) else getattr(r, "url", "")
+            snippet = r.get("description", "")     if isinstance(r, dict) else getattr(r, "description", "")
             lines.append(f"{i}. **{title}**")
             if url:
                 lines.append(f"   {url}")
@@ -66,3 +66,38 @@ def web_search(api_key: str, query: str, limit: int = 5) -> str:
     except Exception as e:
         logger.exception(f"[Firecrawl] Error searching '{query}': {e}")
         return f"Error al buscar '{query}': {e}"
+
+
+def web_fill_form(api_key: str, url: str, actions: list) -> str:
+    """
+    Interacts with a webpage: fills form fields, clicks buttons, submits forms.
+
+    actions is a list of dicts, each with:
+      {"type": "click",      "selector": "css-selector"}
+      {"type": "write",      "selector": "css-selector", "text": "value"}
+      {"type": "wait",       "milliseconds": 1000}
+      {"type": "screenshot"}  (returns visual confirmation)
+
+    Returns the final page content after all actions are performed.
+    Use this to register accounts, fill forms, or interact with web apps.
+    """
+    if not api_key:
+        return "No está configurada la API key de Firecrawl (FIRECRAWL_API_KEY)."
+    try:
+        from firecrawl import FirecrawlApp
+        app = FirecrawlApp(api_key=api_key)
+        result = app.scrape_url(
+            url,
+            formats=["markdown"],
+            actions=actions,
+        )
+        content = result.markdown or ""
+        if not content.strip():
+            return "Las acciones se ejecutaron pero la página resultante está vacía o bloqueada."
+        if len(content) > _MAX_CONTENT_CHARS:
+            content = content[:_MAX_CONTENT_CHARS] + f"\n\n[...contenido recortado]"
+        logger.info(f"[Firecrawl] web_fill_form on {url} — {len(actions)} actions, result length: {len(content)}")
+        return content
+    except Exception as e:
+        logger.exception(f"[Firecrawl] Error filling form on {url}: {e}")
+        return f"Error al interactuar con {url}: {e}"

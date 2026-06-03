@@ -875,6 +875,36 @@ TOOLS = [
         },
     },
     {
+        "name": "web_fill_form",
+        "description": (
+            "Interacts with a webpage by filling form fields, clicking buttons, and submitting forms. "
+            "Use this to register accounts, log in, or complete any web form on behalf of the owner. "
+            "First scrape the page with web_scrape to understand the form structure, then call this "
+            "with the appropriate actions. "
+            "Each action is one of: "
+            "{\"type\": \"click\", \"selector\": \"css-selector\"} — click a button or link; "
+            "{\"type\": \"write\", \"selector\": \"css-selector\", \"text\": \"value\"} — type into a field; "
+            "{\"type\": \"wait\", \"milliseconds\": 1000} — wait for the page to load; "
+            "{\"type\": \"screenshot\"} — capture the result. "
+            "Returns the final page content after all actions are performed."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The URL of the page to interact with.",
+                },
+                "actions": {
+                    "type": "array",
+                    "description": "List of actions to perform in order.",
+                    "items": {"type": "object"},
+                },
+            },
+            "required": ["url", "actions"],
+        },
+    },
+    {
         "name": "web_search",
         "description": (
             "Searches the web for a query and returns a summary of the top results. "
