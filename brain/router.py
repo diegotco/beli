@@ -85,6 +85,8 @@ Tools are needed for:
 - Checking balance, sending payments (Payg0)
 - Setting timezone or preferences
 - Any X / Twitter action: posting tweets, creating polls, reading mentions, checking tweet stats
+- Opening or reading a URL / link / webpage
+- Searching the web for current information, news, prices, or anything external
 - Any real-world action or data lookup from connected services
 
 Tools are NOT needed for:

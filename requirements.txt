@@ -35,3 +35,6 @@ openai>=1.30.0
 
 # X / Twitter API v2
 tweepy>=4.14.0
+
+# Firecrawl (web browsing and search)
+firecrawl-py>=1.0.0

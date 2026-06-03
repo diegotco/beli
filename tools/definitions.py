@@ -855,4 +855,45 @@ TOOLS = [
             "required": ["text"],
         },
     },
+    {
+        "name": "web_scrape",
+        "description": (
+            "Fetches a URL and returns its content as clean markdown. "
+            "Use this when the owner shares a link and wants to know what's on it, "
+            "or when you need to read the content of a specific webpage. "
+            "Returns the page title, URL, and full text content."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "The full URL to fetch (must start with http:// or https://).",
+                },
+            },
+            "required": ["url"],
+        },
+    },
+    {
+        "name": "web_search",
+        "description": (
+            "Searches the web for a query and returns a summary of the top results. "
+            "Use this when the owner asks about current events, news, prices, or anything "
+            "that requires up-to-date or external information you don't have."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "The search query in natural language.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of results to return (default 5, max 10).",
+                },
+            },
+            "required": ["query"],
+        },
+    },
 ]
