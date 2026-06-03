@@ -87,6 +87,8 @@ Tools are needed for:
 - Any X / Twitter action: posting tweets, creating polls, reading mentions, checking tweet stats
 - Opening or reading a URL / link / webpage
 - Searching the web for current information, news, prices, or anything external
+- Registering, signing up, or creating an account on any website or platform
+- Calling an external API or REST endpoint
 - Any real-world action or data lookup from connected services
 
 Tools are NOT needed for:
