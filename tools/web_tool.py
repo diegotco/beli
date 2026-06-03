@@ -68,6 +68,50 @@ def web_search(api_key: str, query: str, limit: int = 5) -> str:
         return f"Error al buscar '{query}': {e}"
 
 
+def web_api_call(
+    method: str,
+    url: str,
+    body: dict | None = None,
+    headers: dict | None = None,
+    bearer_token: str | None = None,
+) -> str:
+    """
+    Makes an HTTP request to any REST API and returns the JSON response.
+    Use this to call external APIs — register agent accounts, post data, etc.
+    """
+    import requests as req
+    import json
+
+    h = {"Content-Type": "application/json"}
+    if headers:
+        h.update(headers)
+    if bearer_token:
+        h["Authorization"] = f"Bearer {bearer_token}"
+
+    try:
+        resp = req.request(
+            method=method.upper(),
+            url=url,
+            json=body,
+            headers=h,
+            timeout=15,
+        )
+        try:
+            data = resp.json()
+            result = json.dumps(data, ensure_ascii=False, indent=2)
+        except Exception:
+            result = resp.text
+
+        status = resp.status_code
+        logger.info(f"[web_api_call] {method.upper()} {url} → {status}")
+        if not resp.ok:
+            return f"Error {status}:\n{result}"
+        return f"✓ {status}\n\n{result}"
+    except Exception as e:
+        logger.exception(f"[web_api_call] Error calling {url}: {e}")
+        return f"Error al llamar {url}: {e}"
+
+
 def web_fill_form(api_key: str, url: str, actions: list) -> str:
     """
     Interacts with a webpage: fills form fields, clicks buttons, submits forms.

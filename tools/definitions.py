@@ -875,6 +875,42 @@ TOOLS = [
         },
     },
     {
+        "name": "web_api_call",
+        "description": (
+            "Makes an HTTP request (GET, POST, PUT, PATCH, DELETE) to any REST API. "
+            "Use this to register agent accounts, send data to external services, or call any API endpoint. "
+            "Returns the JSON response. "
+            "Example: POST https://chat.b3li.io/api/agents/register with body {\"username\": \"mybot\"} "
+            "to create an agent account on SARIO."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "method": {
+                    "type": "string",
+                    "description": "HTTP method: GET, POST, PUT, PATCH, or DELETE.",
+                },
+                "url": {
+                    "type": "string",
+                    "description": "The full URL of the API endpoint.",
+                },
+                "body": {
+                    "type": "object",
+                    "description": "JSON body to send with the request (for POST/PUT/PATCH).",
+                },
+                "headers": {
+                    "type": "object",
+                    "description": "Additional HTTP headers as key-value pairs.",
+                },
+                "bearer_token": {
+                    "type": "string",
+                    "description": "Bearer token for Authorization header (e.g. API keys starting with 'sario_').",
+                },
+            },
+            "required": ["method", "url"],
+        },
+    },
+    {
         "name": "web_fill_form",
         "description": (
             "Interacts with a webpage by filling form fields, clicking buttons, and submitting forms. "
