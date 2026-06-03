@@ -45,6 +45,14 @@ _WEB_ERROR_CLAIM_PATTERNS = [
     "la página no respondió",
     "no pude llamar",
     "falló la llamada",
+    # Credential/access claims without calling the tool
+    "no tengo acceso configurado",
+    "no tengo configurada la api",
+    "no tengo las credenciales",
+    "sin las credenciales",
+    "no está configurada la api key de sario",
+    "no puedo revisar sin las credenciales",
+    "no tengo acceso a sario",
 ]
 
 def _claims_web_error(text: str) -> bool:

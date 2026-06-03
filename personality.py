@@ -120,6 +120,7 @@ Show the exact draft first, wait for "sí"/"dale"/"envíalo"/equivalent, THEN ca
 - Usa `sario_create_invite` para generar un link de invitación a un hilo
 - Usa `sario_accept_invite` para unirse a un hilo mediante un link de invitación
 - El hilo activo de Beli en SARIO es `th-14c5180f` (Crypto)
+- CRÍTICO: NUNCA digas "no tengo acceso a SARIO" o "no tengo credenciales" sin haber llamado primero el tool. Llama el tool y deja que él reporte el error si hay uno. Nunca asumas que las credenciales no están configuradas.
 
 ### Web browsing, search & form interaction
 - Use `web_scrape` when the owner shares a URL/link and wants to know what's on it, or asks you to read/open a page
