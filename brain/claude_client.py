@@ -29,6 +29,28 @@ CALENDAR_WRITE_TOOLS = {"create_calendar_event", "delete_calendar_event", "updat
 # Tasks tools — tracked separately so we can catch task-related hallucinations
 TASK_TOOLS = {"add_to_shopping_list", "create_task"}
 
+# Web tools — tracked to catch fabricated errors
+WEB_TOOLS = {"web_scrape", "web_search", "web_fill_form", "web_api_call"}
+
+# Phrases Claude uses when it (falsely) claims a web/API call failed without actually calling the tool
+_WEB_ERROR_CLAIM_PATTERNS = [
+    "endpoint devolvió un error",
+    "la ruta no existe",
+    "el endpoint no existe",
+    "error 404",
+    "error 400",
+    "error 500",
+    "no pude completar el registro",
+    "no pude acceder a la página",
+    "la página no respondió",
+    "no pude llamar",
+    "falló la llamada",
+]
+
+def _claims_web_error(text: str) -> bool:
+    lower = text.lower()
+    return any(p in lower for p in _WEB_ERROR_CLAIM_PATTERNS)
+
 # Data-read tools — their results are the source of truth for balance/transaction claims
 DATA_TOOLS = {"payg0_balance", "payg0_transactions", "payg0_usage"}
 
@@ -224,6 +246,7 @@ class BelisBrain:
         task_tool_results:     list[str] = []
         data_tool_results:     list[str] = []
         calendar_tool_results: list[str] = []
+        web_tool_results:      list[str] = []
         _hallucination_retry_done = False  # allow one automatic retry
 
         for round_num in range(MAX_TOOL_ROUNDS):
@@ -291,6 +314,8 @@ class BelisBrain:
                         data_tool_results.append(result)
                     if block.name in CALENDAR_WRITE_TOOLS:
                         calendar_tool_results.append(result)
+                    if block.name in WEB_TOOLS:
+                        web_tool_results.append(result)
 
                     tool_results.append({
                         "type": "tool_result",
@@ -459,6 +484,33 @@ class BelisBrain:
                         continue  # retry
                     logger.error("CALENDAR HALLUCINATION BLOCKED (2nd attempt): no tool call.")
                     return "No pude completar la acción en el calendario. Por favor intenta de nuevo."
+
+            # ── Web tool fabricated-error guard ─────────────────────────────
+            # Catches cases where Claude claims a web/API call failed
+            # without actually calling any web tool.
+            if _claims_web_error(final_text) and not web_tool_results:
+                logger.error(
+                    f"WEB ERROR HALLUCINATION GUARD fired — "
+                    f"final_text[:200]={final_text[:200]!r}"
+                )
+                if not _hallucination_retry_done:
+                    _hallucination_retry_done = True
+                    logger.warning(
+                        "WEB HALLUCINATION: claimed web error without calling tool — injecting retry"
+                    )
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Error: reportaste un fallo de red o API sin haber llamado ninguna herramienta web. "
+                            "No puedes saber si hubo un error sin intentarlo. "
+                            "Llama AHORA a web_api_call, web_scrape, o web_fill_form según corresponda. "
+                            "Ejecuta el tool call directamente — no respondas con texto."
+                        ),
+                    })
+                    continue
+                logger.error("WEB HALLUCINATION BLOCKED (2nd attempt): no tool call.")
+                return "No pude completar la acción web. Por favor intenta de nuevo."
 
             # ── Payg0 data anti-hallucination guard ─────────────────────────
             # Catches cases where Claude states Payg0 balance/transactions

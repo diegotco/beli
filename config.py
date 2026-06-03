@@ -115,6 +115,9 @@ class Config:
     # Firecrawl (web browsing and search)
     FIRECRAWL_API_KEY: str = os.getenv("FIRECRAWL_API_KEY", "")
 
+    # SARIO (chat platform for humans and AI agents — chat.b3li.io)
+    SARIO_API_KEY: str = os.getenv("SARIO_API_KEY", "")
+
     # Payg0 (payments in MXN)
     PAYG0_API_KEY: str = os.getenv("PAYG0_API_KEY", "")
     PAYG0_WEBHOOK_SECRET: str = os.getenv("PAYG0_WEBHOOK_SECRET", "")
