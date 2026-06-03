@@ -19,6 +19,7 @@ from channels.telegram import TelegramChannel
 from channels.whatsapp_webhook import handle_webhook
 from channels.email_webhook import handle_email_webhook, register_webhook
 from channels.payg0_webhook import handle_payg0_webhook, register_payg0_webhook
+from channels.sario_webhook import handle_sario_webhook, register_sario_webhook
 from tools.executor import set_memory
 
 logger = logging.getLogger("beli.main")
@@ -35,6 +36,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
 
     whatsapp_callback = None  # callable(payload: dict) -> None
     email_callback    = None  # callable(payload: dict) -> None
+    sario_callback    = None  # callable(payload: dict, raw: bytes, sig: str) -> None
 
     def do_GET(self):  # noqa: N802
         if self.path == "/health":
@@ -65,11 +67,17 @@ class _HealthHandler(BaseHTTPRequestHandler):
             callback = _HealthHandler.email_callback
         elif self.path == "/payg0/webhook":
             callback = _HealthHandler.payg0_callback
+        elif self.path == "/sario/webhook":
+            callback = _HealthHandler.sario_callback
 
         if callback:
             try:
-                payload   = json.loads(body)
-                signature = self.headers.get("X-Payg0-Signature", "")
+                payload = json.loads(body)
+                # Each service uses a different signature header
+                if self.path == "/sario/webhook":
+                    signature = self.headers.get("X-Sario-Signature", "")
+                else:
+                    signature = self.headers.get("X-Payg0-Signature", "")
                 threading.Thread(
                     target=callback, args=(payload, body, signature), daemon=True
                 ).start()
@@ -209,6 +217,34 @@ def main() -> None:
                 logger.info(f"[Payg0] Webhook secret: {secret} — add as PAYG0_WEBHOOK_SECRET in Railway.")
     else:
         logger.info("Payg0 webhook disabled (PAYG0_API_KEY or OWNER_TELEGRAM_CHAT_ID not set).")
+
+    # ── SARIO webhook ─────────────────────────────────────────────────────────
+    if config.OWNER_TELEGRAM_CHAT_ID and config.SARIO_API_KEY:
+        def _on_sario(payload: dict, raw_body: bytes = b"", signature: str = "") -> None:
+            handle_sario_webhook(
+                payload=payload,
+                raw_body=raw_body,
+                signature_header=signature,
+                webhook_secret=config.SARIO_WEBHOOK_SECRET,
+                sario_api_key=config.SARIO_API_KEY,
+                bot_token=config.TELEGRAM_BOT_TOKEN,
+                owner_chat_id=config.OWNER_TELEGRAM_CHAT_ID,
+                brain=brain,
+                memory=memory,
+            )
+        _HealthHandler.sario_callback = _on_sario
+        logger.info("SARIO webhook handler registered.")
+
+        # Auto-register webhook with SARIO on startup
+        if config.BELI_PUBLIC_URL and not config.SARIO_WEBHOOK_SECRET:
+            secret = register_sario_webhook(config.SARIO_API_KEY, config.BELI_PUBLIC_URL)
+            if secret:
+                logger.info(
+                    f"[SARIO] Webhook secret obtained: {secret}\n"
+                    f"        → Add as SARIO_WEBHOOK_SECRET in Railway."
+                )
+    else:
+        logger.info("SARIO webhook disabled (SARIO_API_KEY or OWNER_TELEGRAM_CHAT_ID not set).")
 
     # ── HTTP server ───────────────────────────────────────────────────────────
     _start_health_server()
