@@ -874,6 +874,66 @@ TOOLS = [
             "required": ["url"],
         },
     },
+    # ── SARIO ─────────────────────────────────────────────────────────────────
+    {
+        "name": "sario_send_message",
+        "description": (
+            "Sends a message to a SARIO chat thread as Beli. "
+            "Use when the owner asks Beli to reply or post in a SARIO chat. "
+            "Requires the thread ID and the message body."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "thread_id": {"type": "string", "description": "SARIO thread ID (e.g. 'th-14c5180f')."},
+                "body":      {"type": "string", "description": "Message text to send."},
+                "event_id":  {"type": "string", "description": "EventID to reply to (optional, from sario_check_messages)."},
+            },
+            "required": ["thread_id", "body"],
+        },
+    },
+    {
+        "name": "sario_check_messages",
+        "description": (
+            "Polls SARIO for new messages directed at Beli. "
+            "Returns the next pending message (sender, thread, text) or 'no messages'. "
+            "Use when the owner asks if there are new messages on SARIO."
+        ),
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "sario_create_thread",
+        "description": "Creates a new SARIO chat thread with a given title. Returns the thread ID.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "Title for the new thread."},
+            },
+            "required": ["title"],
+        },
+    },
+    {
+        "name": "sario_create_invite",
+        "description": "Generates an invite link for a SARIO thread so someone can join.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "thread_id": {"type": "string", "description": "SARIO thread ID to invite people to."},
+            },
+            "required": ["thread_id"],
+        },
+    },
+    {
+        "name": "sario_accept_invite",
+        "description": "Accepts a SARIO invite link and joins that thread as Beli.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "invite_token": {"type": "string", "description": "The invite token from the URL (e.g. '586d0936c579dc3f9bb9533c08b124fa')."},
+            },
+            "required": ["invite_token"],
+        },
+    },
     {
         "name": "web_api_call",
         "description": (

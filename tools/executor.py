@@ -10,6 +10,7 @@ from tools.whatsapp_sender import send_whatsapp_message, read_whatsapp_chats, re
 from tools.email_sender import send_email
 from tools.payg0_tool import payg0_balance, payg0_transactions, payg0_send_payment, payg0_payment_detail, payg0_cancel_payment, payg0_check_tier, payg0_usage
 from tools.web_tool import web_scrape, web_search, web_fill_form, web_api_call
+from tools.sario_tool import sario_send_message, sario_check_messages, sario_create_thread, sario_create_invite, sario_accept_invite
 from tools.calendar_tool import read_calendar_events, create_calendar_event, delete_calendar_event, update_calendar_event
 from tools.gmail_tool import read_gmail_inbox, read_gmail_message, send_gmail_message
 from tools.tasks_tool import (
@@ -478,6 +479,37 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
                 poll_options=tool_input.get("poll_options") or None,
                 poll_duration_hours=int(tool_input.get("poll_duration_hours", 24)),
             ),
+        )
+
+    # ── SARIO ─────────────────────────────────────────────────────────────────
+
+    if tool_name == "sario_send_message":
+        return sario_send_message(
+            api_key=config.SARIO_API_KEY,
+            thread_id=tool_input.get("thread_id", ""),
+            body=tool_input.get("body", ""),
+            event_id=tool_input.get("event_id", ""),
+        )
+
+    if tool_name == "sario_check_messages":
+        return sario_check_messages(api_key=config.SARIO_API_KEY)
+
+    if tool_name == "sario_create_thread":
+        return sario_create_thread(
+            api_key=config.SARIO_API_KEY,
+            title=tool_input.get("title", ""),
+        )
+
+    if tool_name == "sario_create_invite":
+        return sario_create_invite(
+            api_key=config.SARIO_API_KEY,
+            thread_id=tool_input.get("thread_id", ""),
+        )
+
+    if tool_name == "sario_accept_invite":
+        return sario_accept_invite(
+            api_key=config.SARIO_API_KEY,
+            invite_token=tool_input.get("invite_token", ""),
         )
 
     # ── Web browsing (Firecrawl) ──────────────────────────────────────────────
