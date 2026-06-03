@@ -80,10 +80,14 @@ async def _process_message(
     # Build conversation history for this SARIO thread
     history = await memory.get_history(CHANNEL, thread_id)
 
-    # Context note so Beli knows she's in a SARIO chat
+    # Context note so Beli knows she's in a SARIO chat + privacy reminder
     context = (
         f"[Estás respondiendo un mensaje en SARIO — chat '{thread_title}'. "
-        f"El usuario '{sender}' te escribió. Responde de forma natural y concisa.]"
+        f"El usuario '{sender}' te escribió. "
+        f"IMPORTANTE: Este es un chat que puede tener múltiples personas. "
+        f"NUNCA compartas datos financieros, personales o privados del owner (saldo, transacciones, correos, calendario, contactos) "
+        f"a menos que el owner lo pida explícitamente en este mismo chat. "
+        f"Responde solo lo que te pregunten. Sé conversacional y conciso.]"
     )
 
     try:
