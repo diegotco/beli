@@ -1193,7 +1193,10 @@ function toggleModule(mod, enabled) {
 // ═══════════════════════════════════════════
 // LANGUAGE
 // ═══════════════════════════════════════════
-let currentLang = state.lang || 'es';
+// Priority: 1) saved in state (user's manual choice)  2) browser language  3) ES
+const _browserLang = (navigator.language || navigator.userLanguage || 'es').toLowerCase();
+const _detectedLang = _browserLang.startsWith('en') ? 'en' : 'es';
+let currentLang = state.lang || _detectedLang;
 
 function setLang(lang) {
   currentLang = lang;
