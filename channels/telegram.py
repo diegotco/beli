@@ -124,6 +124,7 @@ class TelegramChannel:
         self.app.add_handler(CommandHandler("digest", self._cmd_digest))
         self.app.add_handler(CommandHandler("timezone", self._cmd_timezone))
         self.app.add_handler(CommandHandler("notificaciones", self._cmd_notifications))
+        self.app.add_handler(CommandHandler("logs", self._cmd_logs))
         self.app.add_handler(CallbackQueryHandler(self._cb_notifications, pattern="^notif:"))
         # Hourly fact extraction job
         self.app.job_queue.run_repeating(
@@ -267,6 +268,7 @@ class TelegramChannel:
             "  /timezone <zona>    — cambia tu zona horaria (actual: " + tz + ")\n"
             "  /borrar             — borra el historial de conversación\n"
             "  /memoria            — muestra los hechos que recuerdo sobre ti\n"
+            "  /logs [n]           — últimas n líneas de log (default 50, max 100)\n"
             "  /ayuda              — muestra esta ayuda\n\n"
             "Ejemplos de zona horaria: America/Mexico_City, America/Guayaquil, America/New_York\n\n"
             "Simplemente escríbeme lo que necesites 💬"
@@ -522,6 +524,41 @@ class TelegramChannel:
             return
 
         await query.answer()
+
+    async def _cmd_logs(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """
+        /logs [n] — shows the last n log lines (default 50, max 100).
+        Only the owner (OWNER_TELEGRAM_CHAT_ID) can use this command.
+        """
+        from log_buffer import log_buffer
+
+        user_id = update.effective_user.id
+        if self._owner_chat_id and user_id != self._owner_chat_id:
+            await update.message.reply_text("⛔ Solo el owner puede ver los logs.")
+            return
+
+        # Parse optional count argument
+        n = 50
+        if context.args:
+            try:
+                n = max(1, min(100, int(context.args[0])))
+            except ValueError:
+                pass
+
+        lines = log_buffer.get_last(n)
+        if not lines:
+            await update.message.reply_text("Sin logs en memoria todavía.")
+            return
+
+        # Telegram messages are limited to 4096 chars — split if needed
+        chunk = ""
+        for line in lines:
+            if len(chunk) + len(line) + 1 > 3800:
+                await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
+                chunk = ""
+            chunk += line + "\n"
+        if chunk:
+            await update.message.reply_text(f"```\n{chunk}\n```", parse_mode="Markdown")
 
     # ------------------------------------------------------------------
     # MESSAGES

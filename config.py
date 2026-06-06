@@ -31,6 +31,10 @@ logging.basicConfig(
     ],
 )
 
+# Attach in-memory ring buffer so /logs Telegram command can surface recent entries
+from log_buffer import attach as _attach_log_buffer  # noqa: E402
+_attach_log_buffer()
+
 logger = logging.getLogger("beli.config")
 
 
