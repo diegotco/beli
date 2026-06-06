@@ -823,8 +823,8 @@ class TelegramChannel:
                     return
 
             # Load persisted state
-            last_mention_id = await self.memory.get_setting("x_last_mention_id")
-            last_dm_id      = await self.memory.get_setting("x_last_dm_id")
+            last_mention_id = await self.memory.get_setting("x_last_mention_id") or None
+            last_dm_id      = await self.memory.get_setting("x_last_dm_id") or None
             like_counts_raw = await self.memory.get_setting("x_like_counts")
             like_counts     = json.loads(like_counts_raw) if like_counts_raw else {}
 
