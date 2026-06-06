@@ -18,6 +18,7 @@ import logging
 import requests
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
+from telethon.tl.functions.messages import GetPeerDialogsRequest
 from telethon.tl.types import Channel, Chat, User
 
 logger = logging.getLogger("beli.telegram.listener")
@@ -37,19 +38,32 @@ def _entity_name(entity) -> str:
     )
 
 
-def _is_muted(dialog) -> bool:
-    ns = getattr(getattr(dialog, "dialog", None), "notify_settings", None)
-    if not ns:
-        return False
-    mute_until = getattr(ns, "mute_until", None)
-    if not mute_until:
-        return False
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-    if isinstance(mute_until, datetime.datetime):
-        if mute_until.tzinfo is None:
-            mute_until = mute_until.replace(tzinfo=datetime.timezone.utc)
-        return mute_until > now
-    return int(mute_until) > int(now.timestamp())
+async def _is_muted_for_chat(client: TelegramClient, chat) -> bool:
+    """
+    Queries Telegram directly for the mute status of a specific chat/channel.
+
+    Uses GetPeerDialogsRequest so we don't depend on the chat appearing in the
+    first N results of get_dialogs() (which defaults to 20 and would miss any
+    channel not recently active).
+
+    Muted-forever is represented by mute_until == 2147483647 (max int32).
+    """
+    try:
+        result = await client(GetPeerDialogsRequest(peers=[chat]))
+        if not result.dialogs:
+            return False
+        d  = result.dialogs[0]
+        ns = getattr(d, "notify_settings", None)
+        if ns is None:
+            return False
+        mute_until = getattr(ns, "mute_until", None)
+        if not mute_until:
+            return False
+        now_ts = int(datetime.datetime.now(tz=datetime.timezone.utc).timestamp())
+        return int(mute_until) > now_ts
+    except Exception as e:
+        logger.debug(f"[Listener] Could not check mute status for chat: {e}")
+        return False  # If we can't check, default to not-muted (safe fallback)
 
 
 def _send_telegram(token: str, chat_id: int, text: str) -> None:
@@ -92,17 +106,9 @@ async def _build_notification(event, client: TelegramClient, bot_token: str, own
 
         # For groups/channels: skip muted ones
         if is_group:
-            try:
-                dialog = await client.get_dialogs()
-                chat_id = getattr(chat, "id", None)
-                for d in dialog:
-                    if getattr(d.entity, "id", None) == chat_id:
-                        if _is_muted(d):
-                            logger.debug(f"[Listener] Skipping muted chat: {chat_name}")
-                            return
-                        break
-            except Exception:
-                pass  # If we can't check mute status, proceed anyway
+            if await _is_muted_for_chat(client, chat):
+                logger.debug(f"[Listener] Skipping muted chat: {chat_name}")
+                return
 
         # Build message body
         body = msg.text or ""
