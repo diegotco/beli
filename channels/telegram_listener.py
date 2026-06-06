@@ -61,10 +61,17 @@ async def _load_muted_chats(client: TelegramClient) -> None:
             if ns is None:
                 continue
             mute_until = getattr(ns, "mute_until", None)
-            if mute_until and int(mute_until) > now_ts:
-                eid = getattr(entity, "id", None)
-                if eid:
-                    muted.add(eid)
+            if mute_until:
+                # Telethon may return mute_until as datetime or as int timestamp
+                if isinstance(mute_until, datetime.datetime):
+                    mu_ts = int(mute_until.replace(tzinfo=datetime.timezone.utc).timestamp()
+                                if mute_until.tzinfo is None else mute_until.timestamp())
+                else:
+                    mu_ts = int(mute_until)
+                if mu_ts > now_ts:
+                    eid = getattr(entity, "id", None)
+                    if eid:
+                        muted.add(eid)
         _muted_chat_ids = muted
         logger.info(
             f"[Listener] Muted-chats cache loaded — {len(_muted_chat_ids)} muted chats."
@@ -99,7 +106,12 @@ async def _is_muted_for_chat(client: TelegramClient, chat) -> bool:
         if not mute_until:
             return False
         now_ts = int(datetime.datetime.now(tz=datetime.timezone.utc).timestamp())
-        return int(mute_until) > now_ts
+        if isinstance(mute_until, datetime.datetime):
+            mu_ts = int(mute_until.replace(tzinfo=datetime.timezone.utc).timestamp()
+                        if mute_until.tzinfo is None else mute_until.timestamp())
+        else:
+            mu_ts = int(mute_until)
+        return mu_ts > now_ts
     except Exception as e:
         logger.debug(f"[Listener] Could not check mute status for chat: {e}")
         return False
