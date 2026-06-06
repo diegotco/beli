@@ -46,12 +46,30 @@ def _get_session_status(waha_url: str, session: str, api_key: str) -> str:
         return "unknown"
 
 
+def _normalize_mx_number(number: str) -> str:
+    """
+    Inserts the mobile '1' for Mexican numbers stored in the old format.
+
+    Mexico reformed its numbering in 2020 — mobile numbers are now:
+      +52 1 XXX XXX XXXX  (13 digits: 52 + 1 + 10)
+    Older stored numbers often omit the '1':
+      +52 XXX XXX XXXX    (12 digits: 52 + 10)
+
+    WhatsApp requires the full 13-digit form to deliver messages.
+    """
+    if number.startswith("52") and len(number) == 12:
+        return "521" + number[2:]
+    return number
+
+
 def _to_chat_id(phone: str) -> str:
     """
     Converts a phone number to a WhatsApp chat ID.
-    '+52 556 110 3975' → '525561103975@c.us'
+    '+52 999 103 7152' → '5219991037152@c.us'  (MX mobile: inserts the '1')
+    '+52 556 110 3975' → '525561103975@c.us'   (already correct)
     """
     clean = phone.lstrip("+").replace(" ", "").replace("-", "")
+    clean = _normalize_mx_number(clean)
     return f"{clean}@c.us"
 
 
@@ -88,9 +106,10 @@ def _resolve_chat_id(
     if "@" in recipient:
         return recipient, recipient
 
-    # Looks like a phone number → convert directly
+    # Looks like a phone number → normalize and convert directly
     stripped = recipient.lstrip("+").replace(" ", "").replace("-", "")
     if stripped.isdigit():
+        stripped = _normalize_mx_number(stripped)
         chat_id = f"{stripped}@c.us"
         return chat_id, recipient
 
