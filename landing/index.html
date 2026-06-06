@@ -663,7 +663,11 @@
 
   <script>
     // ── Language toggle ──
-    let currentLang = localStorage.getItem('beli-lang') || 'es';
+    // Priority: 1) user's manual choice (localStorage)  2) browser language  3) default ES
+    const _saved    = localStorage.getItem('beli-lang');
+    const _browser  = (navigator.language || navigator.userLanguage || 'es').toLowerCase();
+    const _detected = _browser.startsWith('en') ? 'en' : 'es';
+    let currentLang = _saved || _detected;
 
     function setLang(lang) {
       currentLang = lang;
