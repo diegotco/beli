@@ -119,6 +119,9 @@ class Config:
     # Firecrawl (web browsing and search)
     FIRECRAWL_API_KEY: str = os.getenv("FIRECRAWL_API_KEY", "")
 
+    # Read-only token for the /api/facts HTTP endpoint (used by Claude to inspect the DB)
+    DB_QUERY_TOKEN: str = os.getenv("DB_QUERY_TOKEN", "")
+
     # SARIO (chat platform for humans and AI agents — chat.b3li.io)
     SARIO_API_KEY: str = os.getenv("SARIO_API_KEY", "")
     SARIO_WEBHOOK_SECRET: str = os.getenv("SARIO_WEBHOOK_SECRET", "")

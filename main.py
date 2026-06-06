@@ -44,9 +44,69 @@ class _HealthHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/plain")
             self.end_headers()
             self.wfile.write(b"OK")
+
+        elif self.path.startswith("/api/facts"):
+            self._handle_facts_api()
+
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_facts_api(self) -> None:
+        """
+        GET /api/facts?token=<DB_QUERY_TOKEN>[&search=<term>]
+
+        Returns all stored user_facts from SQLite as a JSON array.
+        Optional ?search= filters rows where the fact contains the term.
+
+        Protected by DB_QUERY_TOKEN env var. Add it in Railway and share
+        it with Claude so it can query the production database directly.
+        """
+        import sqlite3 as _sqlite
+        from urllib.parse import urlparse, parse_qs
+
+        def _respond(status: int, body: str, content_type: str = "application/json") -> None:
+            encoded = body.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        token_required = config.DB_QUERY_TOKEN
+        if not token_required:
+            _respond(403, '{"error": "DB_QUERY_TOKEN not configured on this instance"}')
+            return
+
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        token  = params.get("token", [""])[0]
+
+        if token != token_required:
+            _respond(401, '{"error": "Unauthorized"}')
+            return
+
+        search = params.get("search", [""])[0].lower().strip()
+
+        try:
+            conn   = _sqlite.connect(str(config.DB_PATH), check_same_thread=False)
+            cursor = conn.execute(
+                "SELECT id, channel, user_id, fact FROM user_facts ORDER BY id DESC"
+            )
+            rows = cursor.fetchall()
+            conn.close()
+        except Exception as e:
+            _respond(500, f'{{"error": "{e}"}}')
+            return
+
+        facts = [
+            {"id": r[0], "channel": r[1], "user_id": r[2], "fact": r[3]}
+            for r in rows
+            if not search or search in r[3].lower()
+        ]
+
+        import json as _json
+        _respond(200, _json.dumps(facts, ensure_ascii=False, indent=2))
 
     def do_POST(self):  # noqa: N802
         length  = int(self.headers.get("Content-Length", 0))
