@@ -95,20 +95,20 @@ async def _build_notification(event, client: TelegramClient, bot_token: str, own
         if getattr(sender, "bot", False):
             return
 
-        # Determine chat type and mute status
+        # Determine chat type
         is_direct  = isinstance(chat, User)
         is_group   = isinstance(chat, (Chat, Channel))
 
-        # Check notification settings before going further
+        # Hard rule: muted groups/channels are NEVER forwarded, regardless of
+        # notification settings.  Check this first so it can never be overridden.
+        if is_group and await _is_muted_for_chat(client, chat):
+            logger.debug(f"[Listener] Skipping muted chat: {chat_name}")
+            return
+
+        # Check notification settings (user opt-in required for groups/DMs)
         from settings.notifications import get_settings
         if not get_settings().should_notify_telegram(is_group=is_group):
             return
-
-        # For groups/channels: skip muted ones
-        if is_group:
-            if await _is_muted_for_chat(client, chat):
-                logger.debug(f"[Listener] Skipping muted chat: {chat_name}")
-                return
 
         # Build message body
         body = msg.text or ""
