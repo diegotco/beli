@@ -20,6 +20,32 @@ _REQUEST_TIMEOUT = 30  # seconds
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _get_session_status(waha_url: str, session: str, api_key: str) -> str:
+    """
+    Returns the WAHA session status string (e.g. WORKING, SCAN_QR_CODE, STOPPED,
+    STARTING, FAILED) or 'unknown' if the check fails.
+    Used to log the session health at the moment of a send attempt.
+    """
+    try:
+        resp = requests.get(
+            f"{waha_url.rstrip('/')}/api/sessions/{session}",
+            headers=_headers(api_key),
+            timeout=5,
+        )
+        if resp.status_code < 400:
+            return resp.json().get("status", "unknown")
+        # Older WAHA versions expose status at /api/{session}/me
+        resp2 = requests.get(
+            f"{waha_url.rstrip('/')}/api/{session}/me",
+            headers=_headers(api_key),
+            timeout=5,
+        )
+        return "WORKING" if resp2.status_code < 400 else "unreachable"
+    except Exception as e:
+        logger.debug(f"[WhatsApp] Could not check session status: {e}")
+        return "unknown"
+
+
 def _to_chat_id(phone: str) -> str:
     """
     Converts a phone number to a WhatsApp chat ID.
@@ -127,12 +153,38 @@ def send_whatsapp_message(
             f"{re.sub(r'[^0-9]', '', m)}@c.us" for m in mentions
         ]
 
-    logger.info(f"[WhatsApp] Sending to {chat_id}: {message[:60]}...")
+    # Check WAHA session status before sending so we can log it
+    session_status = _get_session_status(waha_url, session, api_key)
+    logger.info(
+        f"[WhatsApp] Sending to {chat_id} "
+        f"(session_status={session_status}): {message[:60]}..."
+    )
+    if session_status not in ("WORKING", "unknown"):
+        logger.warning(
+            f"[WhatsApp] Session is NOT WORKING (status={session_status}) — "
+            f"message to {chat_id} may not be delivered."
+        )
 
     try:
         resp = requests.post(url, json=payload, headers=_headers(api_key), timeout=_REQUEST_TIMEOUT)
         resp.raise_for_status()
-        logger.info(f"[WhatsApp] Sent successfully to {chat_id}")
+        # Log the full response body — WAHA may return a queued/error status even with HTTP 200
+        resp_data: dict = {}
+        try:
+            resp_data = resp.json()
+        except Exception:
+            pass
+        msg_id     = resp_data.get("id", "?")
+        msg_status = resp_data.get("status", "?")
+        logger.info(
+            f"[WhatsApp] HTTP 200 for {chat_id} — "
+            f"msgId={msg_id} msgStatus={msg_status} body={resp_data}"
+        )
+        # If WAHA signalled the session is broken inside the response body, surface it
+        error_in_body = resp_data.get("error") or resp_data.get("message", "")
+        if error_in_body and isinstance(error_in_body, str) and len(error_in_body) > 2:
+            logger.error(f"[WhatsApp] WAHA returned error in body: {error_in_body}")
+            return f"Error al enviar por WhatsApp: {error_in_body}"
         return f"✓ ENVIADO EXITOSAMENTE por WhatsApp a {display_label}."
     except requests.HTTPError as e:
         detail = ""

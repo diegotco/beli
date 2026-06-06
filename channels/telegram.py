@@ -1035,40 +1035,78 @@ class TelegramChannel:
         Sends a Telegram notification when the session comes back online after
         having been detected as down.  Avoids duplicate 'down' alerts — those
         already arrive from WAHA's own notification system.
+
+        Session statuses reported by WAHA:
+          WORKING       — connected and sending messages normally
+          SCAN_QR_CODE  — needs QR code scan to reconnect
+          STARTING      — session is starting up
+          STOPPED       — session was stopped
+          FAILED        — session failed
         """
+        import datetime as _dt
         import requests as _req
 
+        hdrs = {"X-Api-Key": self._waha_api_key} if self._waha_api_key else {}
+        session_status = "unknown"
+
+        # Primary check: /api/sessions/{session} — gives the real session status string
         try:
-            url  = f"{self._waha_url.rstrip('/')}/api/{self._waha_session}/me"
-            hdrs = {"X-Api-Key": self._waha_api_key} if self._waha_api_key else {}
+            url  = f"{self._waha_url.rstrip('/')}/api/sessions/{self._waha_session}"
             resp = _req.get(url, headers=hdrs, timeout=8)
-            is_up = resp.status_code < 400
+            if resp.status_code < 400:
+                session_status = resp.json().get("status", "unknown")
         except Exception:
-            is_up = False
+            pass
+
+        # Fallback: if sessions endpoint not available, use /api/{session}/me
+        if session_status == "unknown":
+            try:
+                url  = f"{self._waha_url.rstrip('/')}/api/{self._waha_session}/me"
+                resp = _req.get(url, headers=hdrs, timeout=8)
+                session_status = "WORKING" if resp.status_code < 400 else "unreachable"
+            except Exception:
+                session_status = "unreachable"
+
+        is_up = session_status == "WORKING"
+
+        # Always log the current status at INFO so /logs shows recent health history
+        logger.info(f"[WAHA] Health check — session_status={session_status}")
 
         last_status = await self.memory.get_setting("waha_health", "unknown")
+        now_str = _dt.datetime.now(tz=_dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
         if last_status == "down" and is_up:
-            # Transition: down → up — notify owner
+            # Transition: down → up
+            down_since = await self.memory.get_setting("waha_down_since", "?")
             await self.memory.save_setting("waha_health", "up")
-            logger.info("[WAHA] Session back online — notifying owner.")
+            await self.memory.save_setting("waha_down_since", "")
+            logger.info(f"[WAHA] Session back WORKING at {now_str} (was down since {down_since}) — notifying owner.")
             try:
                 await context.bot.send_message(
                     chat_id=self._owner_chat_id,
-                    text="✅ WhatsApp (WAHA) está de vuelta en línea.",
+                    text=f"✅ WhatsApp (WAHA) está de vuelta en línea.\n_(caída detectada: {down_since})_",
+                    parse_mode="Markdown",
                 )
             except Exception as e:
                 logger.error(f"[WAHA] Could not send back-online notification: {e}")
 
         elif last_status != "down" and not is_up:
-            # Transition: up/unknown → down — record silently (alert comes from WAHA)
+            # Transition: up/unknown → down
             await self.memory.save_setting("waha_health", "down")
-            logger.warning("[WAHA] Session appears to be down.")
+            await self.memory.save_setting("waha_down_since", now_str)
+            logger.warning(f"[WAHA] Session is DOWN at {now_str} — status={session_status}")
+
+        elif not is_up and last_status == "down":
+            # Ongoing downtime — log periodically so /logs shows the session is still down
+            down_since = await self.memory.get_setting("waha_down_since", "?")
+            logger.warning(f"[WAHA] Still DOWN — status={session_status} (since {down_since})")
 
         elif last_status == "unknown":
             # First check — just record the current state, no notification
             await self.memory.save_setting("waha_health", "up" if is_up else "down")
-            logger.info(f"[WAHA] Initial health status recorded: {'up' if is_up else 'down'}.")
+            if not is_up:
+                await self.memory.save_setting("waha_down_since", now_str)
+            logger.info(f"[WAHA] Initial health status recorded: {session_status}.")
 
     async def _job_db_backup(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Daily job at 03:00 CDMX: sends SQLite database as a Telegram document backup."""
