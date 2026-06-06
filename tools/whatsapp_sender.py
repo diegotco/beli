@@ -153,16 +153,21 @@ def send_whatsapp_message(
             f"{re.sub(r'[^0-9]', '', m)}@c.us" for m in mentions
         ]
 
-    # Check WAHA session status before sending so we can log it
+    # Check WAHA session status before sending.
+    # If the session is known to be down, fail immediately — never return
+    # SUCCESS_SIGNAL for a message that can't be delivered.
     session_status = _get_session_status(waha_url, session, api_key)
     logger.info(
         f"[WhatsApp] Sending to {chat_id} "
         f"(session_status={session_status}): {message[:60]}..."
     )
     if session_status not in ("WORKING", "unknown"):
-        logger.warning(
-            f"[WhatsApp] Session is NOT WORKING (status={session_status}) — "
-            f"message to {chat_id} may not be delivered."
+        logger.error(
+            f"[WhatsApp] Aborting send — session is NOT WORKING (status={session_status})"
+        )
+        return (
+            f"Error: WhatsApp no está conectado en este momento (estado: {session_status}). "
+            f"Revisa la sesión de WAHA e intenta de nuevo."
         )
 
     try:
