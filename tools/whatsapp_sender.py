@@ -17,6 +17,17 @@ logger = logging.getLogger("beli.tools.whatsapp")
 _DEFAULT_SESSION = "default"
 _REQUEST_TIMEOUT = 30  # seconds
 
+# ── In-process WAHA health state ─────────────────────────────────────────────
+# Set by the health-check job in telegram.py so send attempts can skip the
+# full error message when WAHA is already known to be down.
+_waha_known_down: bool = False
+
+
+def set_waha_known_down(down: bool) -> None:
+    """Called by the WAHA health-check job on each state transition."""
+    global _waha_known_down
+    _waha_known_down = down
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -172,6 +183,13 @@ def send_whatsapp_message(
             f"{re.sub(r'[^0-9]', '', m)}@c.us" for m in mentions
         ]
 
+    # Fast path: if the health-check job already flagged WAHA as down, skip the
+    # live status check and return a SHORT error.  The owner was already notified
+    # once by the health monitor — no need to generate another warning message.
+    if _waha_known_down:
+        logger.warning(f"[WhatsApp] Skipping send to {chat_id} — WAHA is known to be down.")
+        return "Error: WAHA está caído (ya notificado). El mensaje no se entregó."
+
     # Check WAHA session status before sending.
     # If the session is known to be down, fail immediately — never return
     # SUCCESS_SIGNAL for a message that can't be delivered.
@@ -185,8 +203,8 @@ def send_whatsapp_message(
             f"[WhatsApp] Aborting send — session is NOT WORKING (status={session_status})"
         )
         return (
-            f"Error: WhatsApp no está conectado en este momento (estado: {session_status}). "
-            f"Revisa la sesión de WAHA e intenta de nuevo."
+            f"Error: WhatsApp no está conectado (estado: {session_status}). "
+            f"El monitor de WAHA te avisará cuando se recupere."
         )
 
     try:

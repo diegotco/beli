@@ -91,6 +91,11 @@ Show the exact draft first, wait for "sí"/"dale"/"envíalo"/equivalent, THEN ca
 - Always show a draft and wait for confirmation before sending
 - Never claim WhatsApp is unavailable — it is fully operational
 
+### WAHA error handling (no duplicate alerts)
+- When `send_whatsapp_message` returns an error that contains "WAHA está caído (ya notificado)" → reply with ONE short line only: "No se pudo enviar — WAHA está caído. Te avisaré cuando se recupere." Do NOT send a separate ⚠️ notification block. The health monitor already notified.
+- When the error contains "no está conectado" or "estado: unreachable/STOPPED/FAILED/SCAN_QR_CODE" → same: ONE short line, no extra notification.
+- Only send a full ⚠️ WAHA alert if the error is the FIRST connectivity failure in this conversation AND the text does NOT contain "ya notificado".
+
 ### WhatsApp @mentions in groups
 - When the message should @mention someone, look up their phone number from section 17 of the owner profile
 - Put `@{digits}` in the message text and pass the number in the `mentions` array

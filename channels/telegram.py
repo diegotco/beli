@@ -1032,9 +1032,11 @@ class TelegramChannel:
     async def _job_waha_health_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Every 5 minutes: checks if WAHA / WhatsApp session is reachable.
 
-        Sends a Telegram notification when the session comes back online after
-        having been detected as down.  Avoids duplicate 'down' alerts — those
-        already arrive from WAHA's own notification system.
+        Sends ONE Telegram notification on each state transition:
+          up → down : immediate alert so the owner knows before trying to send
+          down → up : back-online confirmation with downtime duration
+
+        Subsequent checks during ongoing downtime just log — no repeated alerts.
 
         Session statuses reported by WAHA:
           WORKING       — connected and sending messages normally
@@ -1069,6 +1071,10 @@ class TelegramChannel:
 
         is_up = session_status == "WORKING"
 
+        # Keep the in-process flag in sync so send attempts know the current state
+        from tools.whatsapp_sender import set_waha_known_down
+        set_waha_known_down(not is_up)
+
         # Always log the current status at INFO so /logs shows recent health history
         logger.info(f"[WAHA] Health check — session_status={session_status}")
 
@@ -1091,10 +1097,22 @@ class TelegramChannel:
                 logger.error(f"[WAHA] Could not send back-online notification: {e}")
 
         elif last_status != "down" and not is_up:
-            # Transition: up/unknown → down
+            # Transition: up/unknown → down — notify ONCE so the owner knows immediately
             await self.memory.save_setting("waha_health", "down")
             await self.memory.save_setting("waha_down_since", now_str)
             logger.warning(f"[WAHA] Session is DOWN at {now_str} — status={session_status}")
+            try:
+                await context.bot.send_message(
+                    chat_id=self._owner_chat_id,
+                    text=(
+                        f"⚠️ WhatsApp (WAHA) está caído — estado: `{session_status}`.\n"
+                        f"Los mensajes de WhatsApp no se entregarán hasta que se recupere.\n"
+                        f"_(detectado: {now_str})_"
+                    ),
+                    parse_mode="Markdown",
+                )
+            except Exception as e:
+                logger.error(f"[WAHA] Could not send down notification: {e}")
 
         elif not is_up and last_status == "down":
             # Ongoing downtime — log periodically so /logs shows the session is still down

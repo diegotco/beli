@@ -32,7 +32,7 @@ _DEFAULTS: dict[str, bool] = {
     "telegram_groups": False,
     # X / Twitter
     "x_mentions": False,
-    "x_likes":    False,
+    "x_likes":    True,   # on by default — like-count changes are low-volume
     "x_dms":      False,
     # Google Calendar
     "calendar_reminders":      False,
