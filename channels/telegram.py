@@ -163,7 +163,7 @@ class TelegramChannel:
             self.app.job_queue.run_repeating(
                 self._job_waha_health_check,
                 interval=300,   # 5 minutes
-                first=120,      # first check 2 minutes after startup
+                first=30,       # first check 30 seconds after startup
             )
             logger.info("WAHA health monitor active — checking every 5 minutes.")
 
@@ -1178,6 +1178,17 @@ class TelegramChannel:
         # Store the running event loop so HTTP threads can submit work to it safely
         from channels.loop_ref import set_loop
         set_loop(asyncio.get_running_loop())
+
+        # Restore WAHA known-down state from DB immediately so that any WhatsApp
+        # send attempt in the first minutes after startup already has the correct
+        # flag — without this, the health check takes 2 min to set it and any
+        # send attempt in that window would generate a duplicate ⚠️ alert.
+        if self._waha_url and self._owner_chat_id:
+            from tools.whatsapp_sender import set_waha_known_down
+            health = await self.memory.get_setting("waha_health", "unknown")
+            if health == "down":
+                set_waha_known_down(True)
+                logger.info("[WAHA] Startup: restored known-down flag from DB — suppressing duplicate alerts.")
 
         # Register visible command list (shown when user types "/")
         from telegram import BotCommand
