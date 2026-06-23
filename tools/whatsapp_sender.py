@@ -7,7 +7,10 @@ a clean REST API. All messages are sent FROM the owner's personal WhatsApp numbe
 WAHA API reference: https://waha.devlike.pro/docs/how-to/send-messages/
 """
 import logging
+import random
 import re
+import time
+from collections import deque
 from typing import Optional
 
 import requests
@@ -27,6 +30,64 @@ def set_waha_known_down(down: bool) -> None:
     """Called by the WAHA health-check job on each state transition."""
     global _waha_known_down
     _waha_known_down = down
+
+
+# ── Anti-ban: throttling between consecutive sends ───────────────────────────
+# WhatsApp flags accounts that fire many messages back-to-back. We enforce a
+# randomized gap between sends so bulk/promotional blasts never go out rapidly.
+_last_send_ts: float = 0.0
+_MIN_GAP_SECONDS = 8.0
+_MAX_GAP_SECONDS = 22.0
+
+
+def compute_send_delay() -> float:
+    """
+    Returns how many seconds to wait before the next WhatsApp send so that
+    consecutive messages are spaced out by a randomized gap.
+
+    The first send (or any send after a long idle period) returns 0 — only
+    rapid back-to-back sends are throttled. Called by the executor, which does
+    the actual `await asyncio.sleep(delay)` so the event loop is never blocked.
+    """
+    global _last_send_ts
+    now = time.monotonic()
+    target_gap = random.uniform(_MIN_GAP_SECONDS, _MAX_GAP_SECONDS)
+    wait = 0.0
+    if _last_send_ts > 0.0:
+        elapsed = now - _last_send_ts
+        if elapsed < target_gap:
+            wait = target_gap - elapsed
+    # Reserve the slot at now+wait so parallel/queued sends keep spacing out
+    _last_send_ts = now + wait
+    return wait
+
+
+# ── Anti-ban: block identical text to multiple recipients ────────────────────
+# Sending the exact same wording to several people is the clearest bulk-spam
+# signal. We remember recent sends and refuse to send an identical message to a
+# new recipient, forcing the brain to rephrase per person.
+_recent_sends: deque = deque(maxlen=50)  # (normalized_text, chat_id, monotonic_ts)
+_DUP_WINDOW_SECONDS = 1800   # 30 min
+_DUP_MIN_LENGTH = 60         # short replies ("ok", "gracias") are exempt
+
+
+def _normalize_text(text: str) -> str:
+    """Lowercase + collapse whitespace for duplicate comparison."""
+    return " ".join(text.lower().split())
+
+
+def _duplicate_recipients(norm_text: str) -> set:
+    """Returns the set of distinct chat_ids this exact text was recently sent to."""
+    now = time.monotonic()
+    return {
+        cid
+        for (t, cid, ts) in _recent_sends
+        if t == norm_text and (now - ts) < _DUP_WINDOW_SECONDS
+    }
+
+
+def _record_send(norm_text: str, chat_id: str) -> None:
+    _recent_sends.append((norm_text, chat_id, time.monotonic()))
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -93,6 +154,51 @@ def _display_name(chat: dict) -> str:
     )
 
 
+def _is_saved_contact(waha_url: str, session: str, api_key: str, chat_id: str) -> Optional[bool]:
+    """
+    Returns True if chat_id is a saved contact, False if definitively not saved,
+    or None if we couldn't determine it (API error — caller should fail open).
+    """
+    try:
+        resp = requests.get(
+            f"{waha_url.rstrip('/')}/api/contacts",
+            params={"contactId": chat_id, "session": session},
+            headers=_headers(api_key),
+            timeout=8,
+        )
+        if resp.status_code >= 400:
+            return None
+        data = resp.json()
+        if isinstance(data, list):
+            data = data[0] if data else {}
+        if not isinstance(data, dict):
+            return None
+        return bool(data.get("isMyContact"))
+    except Exception as e:
+        logger.debug(f"[WhatsApp] Saved-contact check failed for {chat_id}: {e}")
+        return None
+
+
+def _chat_exists(waha_url: str, session: str, api_key: str, chat_id: str) -> Optional[bool]:
+    """
+    Returns True if there's already a conversation with chat_id (we've talked
+    before, in either direction), False if not found, or None if undeterminable.
+    """
+    try:
+        resp = requests.get(
+            f"{waha_url.rstrip('/')}/api/{session}/chats",
+            params={"limit": 300},
+            headers=_headers(api_key),
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            return None
+        return any(c.get("id") == chat_id for c in resp.json())
+    except Exception as e:
+        logger.debug(f"[WhatsApp] Chat-exists check failed for {chat_id}: {e}")
+        return None
+
+
 # ── Tool 1: Send WhatsApp message ─────────────────────────────────────────────
 
 def _headers(api_key: str = "") -> dict:
@@ -155,6 +261,7 @@ def send_whatsapp_message(
     session: str = _DEFAULT_SESSION,
     api_key: str = "",
     mentions: list[str] | None = None,
+    allow_unsaved: bool = False,
 ) -> str:
     """
     Sends a WhatsApp text message FROM the owner's personal number.
@@ -167,6 +274,9 @@ def send_whatsapp_message(
         mentions:  List of phone numbers (digits only) to mention, e.g. ["593987370597"].
                    WhatsApp will show the contact's saved name, not the number.
         session:   WAHA session name (default: 'default')
+        allow_unsaved: Code-level override to bypass the saved-contact gate. Not
+                   exposed to the brain — only set internally for trusted flows
+                   (e.g. birthday scheduler with curated numbers).
     """
     chat_id, display_label = _resolve_chat_id(waha_url, recipient, session, api_key)
 
@@ -189,6 +299,39 @@ def send_whatsapp_message(
     if _waha_known_down:
         logger.warning(f"[WhatsApp] Skipping send to {chat_id} — WAHA is known to be down.")
         return "Error: WAHA está caído (ya notificado). El mensaje no se entregó."
+
+    # ── Anti-ban gate 1: never blast identical text to multiple people ─────────
+    norm = _normalize_text(message)
+    if len(norm) >= _DUP_MIN_LENGTH:
+        already = _duplicate_recipients(norm)
+        if chat_id not in already and already:
+            logger.warning(
+                f"[WhatsApp] Blocked duplicate text to {chat_id} — "
+                f"same message already sent to {len(already)} contact(s)."
+            )
+            return (
+                "Error: este mismo texto ya se envió a otro contacto. Para evitar que "
+                "WhatsApp lo marque como spam, reformula el mensaje (cambia el saludo, "
+                "el orden y las palabras) antes de enviarlo a esta persona."
+            )
+
+    # ── Anti-ban gate 2: only message saved contacts or existing chats ────────
+    is_group = chat_id.endswith("@g.us")
+    if not is_group and not allow_unsaved:
+        saved = _is_saved_contact(waha_url, session, api_key, chat_id)
+        if saved is False:  # definitively NOT a saved contact
+            exists = _chat_exists(waha_url, session, api_key, chat_id)
+            if exists is False:  # and no prior conversation either
+                logger.warning(
+                    f"[WhatsApp] Blocked send to {chat_id} — not a saved contact "
+                    f"and no prior conversation."
+                )
+                return (
+                    f"Error: '{display_label}' no está en tus contactos guardados y no "
+                    f"tienes una conversación previa con esta persona. Para evitar bloqueos "
+                    f"de WhatsApp, Beli solo escribe a contactos guardados. Guarda el número "
+                    f"en tu teléfono primero y vuelve a intentarlo."
+                )
 
     # Check WAHA session status before sending.
     # If the session is known to be down, fail immediately — never return
@@ -227,6 +370,9 @@ def send_whatsapp_message(
         if error_in_body and isinstance(error_in_body, str) and len(error_in_body) > 2:
             logger.error(f"[WhatsApp] WAHA returned error in body: {error_in_body}")
             return f"Error al enviar por WhatsApp: {error_in_body}"
+        # Record for the duplicate-text guard (only successful sends count)
+        if len(norm) >= _DUP_MIN_LENGTH:
+            _record_send(norm, chat_id)
         return f"✓ ENVIADO EXITOSAMENTE por WhatsApp a {display_label}."
     except requests.HTTPError as e:
         detail = ""

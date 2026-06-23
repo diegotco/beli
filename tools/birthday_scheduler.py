@@ -77,7 +77,8 @@ def _send_direct_greeting(
         f"Diego te manda un abrazo enorme — te escribirá personalmente en un rato."
     )
     result = send_whatsapp_message(
-        waha_url=waha_url, recipient=phone, message=msg, session=session, api_key=api_key
+        waha_url=waha_url, recipient=phone, message=msg, session=session, api_key=api_key,
+        allow_unsaved=True,  # curated birthday numbers — skip the saved-contact gate
     )
     logger.info(f"[Birthday] Greeting → {name}: {result}")
 
@@ -91,6 +92,7 @@ def _send_parent_notification(
         f"Diego te escribirá pronto."
     )
     result = send_whatsapp_message(
-        waha_url=waha_url, recipient=parent_phone, message=msg, session=session, api_key=api_key
+        waha_url=waha_url, recipient=parent_phone, message=msg, session=session, api_key=api_key,
+        allow_unsaved=True,  # curated birthday numbers — skip the saved-contact gate
     )
     logger.info(f"[Birthday] Parent notification → {parent_name} (for {child_name}): {result}")

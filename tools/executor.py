@@ -81,6 +81,14 @@ async def execute_tool(tool_name: str, tool_input: dict) -> str:
         )
 
     if tool_name == "send_whatsapp_message":
+        # Anti-ban throttle: space out consecutive sends by a randomized gap so
+        # bulk/promotional messages never go out back-to-back. The first send (or
+        # one after a long idle gap) waits 0s; only rapid sends are delayed.
+        from tools.whatsapp_sender import compute_send_delay
+        delay = compute_send_delay()
+        if delay > 0:
+            logger.info(f"[WhatsApp] Throttling: waiting {delay:.1f}s before next send.")
+            await asyncio.sleep(delay)
         return send_whatsapp_message(
             waha_url=config.WAHA_URL,
             recipient=tool_input.get("recipient", ""),
