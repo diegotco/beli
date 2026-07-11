@@ -77,6 +77,27 @@ telegram_listener.py  email_webhook.py
 (Telethon ghost mode)  payg0_webhook.py
 ```
 
+### Reliability guards (brain/claude_client.py)
+
+Every final response passes through anti-hallucination guards before
+reaching the owner. Each guard verifies claims against actual tool
+results; on a violation it injects a correction and retries once, then
+fails honestly instead of lying:
+
+| Guard | Catches |
+|---|---|
+| Send success | "Enviado ✓" without a confirmed send tool result |
+| Task success | "Agregué a tu lista" without calling add_to_shopping_list |
+| Calendar action | "Agendé el evento" without a calendar write tool call |
+| Web error | Claiming a web/API failure without attempting the call |
+| Payg0 data | Stating balance/transactions without querying Payg0 |
+| Dangling promise | Ending a turn with "Un momento, voy a proceder…" and no tool call — there is no background continuation, so a promised-but-not-executed action would never run |
+
+WhatsApp sends also have anti-ban protections (tools/whatsapp_sender.py):
+randomized 8–22s throttle between consecutive sends, a duplicate-text
+blocker (same wording to a 2nd recipient is refused), and a
+saved-contacts-only gate for cold numbers.
+
 ---
 
 ## 💰 Services & Costs
