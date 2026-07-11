@@ -26,52 +26,80 @@ def check_and_send_birthdays(
     session: str,
     api_key: str,
     contacts_json: str,
-) -> None:
+    skip_names: set[str] | frozenset = frozenset(),
+) -> tuple[list[str], list[str]]:
     """
     Checks today's date (CDMX) against the birthday list and sends WhatsApp messages.
     Called daily at 6 AM CDMX by the Telegram job queue.
+
+    skip_names: contacts already delivered today (used by the retry job so a
+    second pass never double-sends).
+
+    Returns (failures, delivered_names):
+      failures        — human-readable failure descriptions (empty = all good)
+      delivered_names — names successfully delivered in THIS pass
     """
     if not contacts_json or not waha_url:
         logger.debug("[Birthday] Skipped — BIRTHDAY_CONTACTS or WAHA_URL not configured.")
-        return
+        return [], []
 
     try:
         contacts = json.loads(contacts_json)
     except Exception as e:
         logger.error(f"[Birthday] Failed to parse BIRTHDAY_CONTACTS: {e}")
-        return
+        return [f"No pude leer BIRTHDAY_CONTACTS: {e}"], []
 
     today = datetime.datetime.now(tz=_CDMX_TZ)
     logger.info(f"[Birthday] Checking birthdays for {today.strftime('%B %d')}...")
 
-    sent = 0
+    attempted = 0
+    failures: list[str] = []
+    delivered: list[str] = []
     for contact in contacts:
         if contact.get("month") == today.month and contact.get("day") == today.day:
             contact_type = contact.get("type", "direct")
             name = contact.get("name", "")
+            if name in skip_names:
+                logger.info(f"[Birthday] {name}: already delivered today — skipping.")
+                continue
 
             if contact_type == "direct":
                 phone = contact.get("phone", "")
                 if phone:
-                    _send_direct_greeting(waha_url, session, api_key, name, phone)
-                    sent += 1
+                    attempted += 1
+                    result = _send_direct_greeting(waha_url, session, api_key, name, phone)
+                    if _is_success(result):
+                        delivered.append(name)
+                    else:
+                        failures.append(f"Felicitación a {name}: {result}")
 
             elif contact_type == "sobrino":
                 parent_name = contact.get("parent_name", "")
                 parent_phone = contact.get("parent_phone", "")
                 if parent_phone:
-                    _send_parent_notification(waha_url, session, api_key, name, parent_name, parent_phone)
-                    sent += 1
+                    attempted += 1
+                    result = _send_parent_notification(
+                        waha_url, session, api_key, name, parent_name, parent_phone
+                    )
+                    if _is_success(result):
+                        delivered.append(name)
+                    else:
+                        failures.append(f"Aviso a {parent_name} (cumple {name}): {result}")
 
-    if sent == 0:
-        logger.info("[Birthday] No birthdays today.")
+    if attempted == 0:
+        logger.info("[Birthday] No birthdays pending today.")
     else:
-        logger.info(f"[Birthday] {sent} message(s) sent.")
+        logger.info(f"[Birthday] {len(delivered)}/{attempted} message(s) delivered.")
+    return failures, delivered
+
+
+def _is_success(result: str) -> bool:
+    return result.startswith("✓")
 
 
 def _send_direct_greeting(
     waha_url: str, session: str, api_key: str, name: str, phone: str
-) -> None:
+) -> str:
     msg = (
         f"¡Feliz cumpleaños {name}! 🎂 "
         f"Diego te manda un abrazo enorme — te escribirá personalmente en un rato."
@@ -81,12 +109,13 @@ def _send_direct_greeting(
         allow_unsaved=True,  # curated birthday numbers — skip the saved-contact gate
     )
     logger.info(f"[Birthday] Greeting → {name}: {result}")
+    return result
 
 
 def _send_parent_notification(
     waha_url: str, session: str, api_key: str,
     child_name: str, parent_name: str, parent_phone: str
-) -> None:
+) -> str:
     msg = (
         f"¡Hoy cumple años {child_name}! 🎉 "
         f"Diego te escribirá pronto."
@@ -96,3 +125,4 @@ def _send_parent_notification(
         allow_unsaved=True,  # curated birthday numbers — skip the saved-contact gate
     )
     logger.info(f"[Birthday] Parent notification → {parent_name} (for {child_name}): {result}")
+    return result

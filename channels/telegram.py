@@ -866,16 +866,78 @@ class TelegramChannel:
         except Exception as e:
             logger.exception(f"[X] Error in X monitor job: {e}")
 
+    _BIRTHDAY_MAX_RETRIES = 8          # every 2h → covers 6 AM to ~10 PM
+    _BIRTHDAY_RETRY_SECONDS = 7200
+
     async def _job_birthday_check(self, context: ContextTypes.DEFAULT_TYPE) -> None:
-        """Daily job at 6 AM CDMX: sends birthday WhatsApp messages."""
+        """Daily job at 6 AM CDMX: sends birthday WhatsApp messages.
+
+        If a send fails (e.g. WAHA down at 6 AM), it alerts the owner ONCE and
+        keeps retrying every 2 hours for the rest of the day, skipping the
+        contacts already delivered — a birthday message is never silently lost.
+        """
         from tools.birthday_scheduler import check_and_send_birthdays
+        import datetime as _dt
         try:
-            check_and_send_birthdays(
+            retry_num = (context.job.data or {}).get("retry", 0) if context.job else 0
+
+            # Names already delivered today (persisted so restarts don't double-send)
+            today_key = "birthday_sent_" + _dt.datetime.now(
+                tz=zoneinfo.ZoneInfo("America/Mexico_City")
+            ).strftime("%Y-%m-%d")
+            sent_raw = await self.memory.get_setting(today_key)
+            already_sent = set(json.loads(sent_raw)) if sent_raw else set()
+
+            failures, delivered = check_and_send_birthdays(
                 waha_url=self._waha_url,
                 session=self._waha_session,
                 api_key=self._waha_api_key,
                 contacts_json=self._birthday_contacts_json,
+                skip_names=already_sent,
             )
+
+            if delivered:
+                already_sent.update(delivered)
+                await self.memory.save_setting(today_key, json.dumps(sorted(already_sent)))
+                if retry_num > 0:
+                    # A retry finally got through — tell the owner it's resolved
+                    await context.bot.send_message(
+                        chat_id=self._owner_chat_id,
+                        text=f"✅ Mensaje(s) de cumpleaños entregado(s) tras reintento: {', '.join(delivered)}.",
+                    )
+
+            if failures:
+                if retry_num == 0:
+                    # First failure of the day — alert the owner once
+                    detail = "\n".join(f"• {f}" for f in failures)
+                    await context.bot.send_message(
+                        chat_id=self._owner_chat_id,
+                        text=(
+                            f"🎂⚠️ No pude enviar mensaje(s) de cumpleaños:\n{detail}\n\n"
+                            f"Reintentaré cada 2 horas el resto del día. "
+                            f"Si WAHA sigue caído, considera enviarlos manualmente."
+                        ),
+                    )
+                if retry_num < self._BIRTHDAY_MAX_RETRIES:
+                    context.job_queue.run_once(
+                        self._job_birthday_check,
+                        when=self._BIRTHDAY_RETRY_SECONDS,
+                        data={"retry": retry_num + 1},
+                        name=f"birthday_retry_{retry_num + 1}",
+                    )
+                    logger.info(
+                        f"[Birthday] {len(failures)} failure(s) — retry "
+                        f"{retry_num + 1}/{self._BIRTHDAY_MAX_RETRIES} scheduled in 2h."
+                    )
+                else:
+                    logger.error("[Birthday] Max retries reached — giving up for today.")
+                    await context.bot.send_message(
+                        chat_id=self._owner_chat_id,
+                        text=(
+                            "🎂❌ Agoté los reintentos de hoy para los mensajes de cumpleaños "
+                            "pendientes. Envíalos manualmente, por favor."
+                        ),
+                    )
         except Exception as e:
             logger.exception(f"Error in birthday check job: {e}")
 
@@ -1118,6 +1180,29 @@ class TelegramChannel:
             # Ongoing downtime — log periodically so /logs shows the session is still down
             down_since = await self.memory.get_setting("waha_down_since", "?")
             logger.warning(f"[WAHA] Still DOWN — status={session_status} (since {down_since})")
+
+            # Remind the owner at most once per 24h during a prolonged outage.
+            # Without this, a weeks-long outage produces a single transition
+            # alert that is easy to miss (this is how Joaco's birthday message
+            # was lost on 2026-07-05).
+            last_reminder_raw = await self.memory.get_setting("waha_down_last_reminder")
+            now_ts = _dt.datetime.now(tz=_dt.timezone.utc).timestamp()
+            last_reminder_ts = float(last_reminder_raw) if last_reminder_raw else 0.0
+            if now_ts - last_reminder_ts >= 86400:
+                await self.memory.save_setting("waha_down_last_reminder", str(now_ts))
+                try:
+                    await context.bot.send_message(
+                        chat_id=self._owner_chat_id,
+                        text=(
+                            f"⏰ Recordatorio: WhatsApp (WAHA) sigue caído desde {down_since} "
+                            f"(estado: `{session_status}`). Los mensajes de WhatsApp — incluidos "
+                            f"los de cumpleaños — NO están saliendo. "
+                            f"Si el estado es SCAN_QR_CODE, escanea el QR en el dashboard de WAHA."
+                        ),
+                        parse_mode="Markdown",
+                    )
+                except Exception as e:
+                    logger.error(f"[WAHA] Could not send daily down reminder: {e}")
 
         elif last_status == "unknown":
             # First check — just record the current state, no notification
