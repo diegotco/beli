@@ -152,6 +152,33 @@ def _claims_calendar_action(text: str) -> bool:
     lower = text.lower()
     return any(p in lower for p in _CALENDAR_CLAIM_PATTERNS)
 
+
+# Phrases where Claude PROMISES an imminent action and then ends its turn.
+# There is no "later" — if the tool isn't called in the same response, nothing
+# ever runs. E.g. "Voy a proceder a crear los eventos. Un momento, por favor."
+_PENDING_PROMISE_PATTERNS = [
+    "un momento",
+    "voy a proceder",
+    "procedo a ",
+    "enseguida lo",
+    "enseguida te",
+    "dame un segundo",
+    "dame unos segundos",
+    "espera un segundo",
+    "ahora mismo lo",
+    "ahora mismo los",
+    "en breve",
+    "déjame crear",
+    "déjame agendar",
+    "déjame enviar",
+]
+
+
+def _claims_pending_action(text: str) -> bool:
+    """True if the text ends the turn promising an action it never executed."""
+    lower = text.lower()
+    return any(p in lower for p in _PENDING_PROMISE_PATTERNS)
+
 # Phrases Claude uses when it (falsely) claims to have added tasks/shopping items
 _TASK_CLAIM_PATTERNS = [
     "agregué",
@@ -545,6 +572,39 @@ class BelisBrain:
                 logger.error("PAYG0 HALLUCINATION BLOCKED (2nd attempt): no tool call.")
                 return (
                     "Hubo un problema al consultar tu saldo de Payg0. Por favor intenta de nuevo."
+                )
+
+            # ── Dangling-promise guard ──────────────────────────────────────
+            # Claude ended its turn PROMISING an imminent action ("Voy a
+            # proceder a crear los eventos. Un momento, por favor.") without a
+            # tool call in this response. There is no background continuation —
+            # if the tool isn't called now, it never runs. Questions are exempt
+            # (a draft + "¿confirmas?" legitimately defers the action).
+            if _claims_pending_action(final_text) and "?" not in final_text:
+                logger.error(
+                    f"DANGLING PROMISE GUARD fired — final_text[:200]={final_text[:200]!r}"
+                )
+                if not _hallucination_retry_done:
+                    _hallucination_retry_done = True
+                    logger.warning(
+                        "DANGLING PROMISE: promised an action and ended the turn — injecting retry"
+                    )
+                    messages.append({"role": "assistant", "content": response.content})
+                    messages.append({
+                        "role": "user",
+                        "content": (
+                            "Error: prometiste una acción ('un momento', 'voy a proceder') y "
+                            "terminaste tu respuesta sin llamar ninguna herramienta. NO existe "
+                            "un 'después' — si no ejecutas el tool call en esta misma respuesta, "
+                            "la acción nunca ocurrirá. Ejecuta AHORA las herramientas necesarias "
+                            "(todas, una por una si son varias). No respondas con texto."
+                        ),
+                    })
+                    continue  # retry — Claude sees the correction
+                logger.error("DANGLING PROMISE BLOCKED (2nd attempt): still no tool call.")
+                return (
+                    "⚠️ No se ejecutó la acción — quedó prometida pero sin realizar. "
+                    "Por favor pídemelo de nuevo."
                 )
 
             return final_text
