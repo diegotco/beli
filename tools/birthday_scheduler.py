@@ -7,9 +7,9 @@ Two message types:
   - direct:   Sends a warm greeting directly to the birthday person.
   - sobrino:  Sends a heads-up to the parent (Sensei or Alanis) that Diego will write soon.
 
-All messages are sent ghost-mode from Diego's WhatsApp number via WAHA, so they
-are written in first person and signed — the recipient must see them as coming
-from Diego himself, not from an assistant writing on his behalf.
+All messages are sent ghost-mode from Diego's WhatsApp number via WAHA. Because
+Beli — not Diego — writes them, they refer to Diego in the third person and end
+with _SIGNATURE so the recipient knows who is actually writing.
 """
 import json
 import logging
@@ -21,6 +21,11 @@ from tools.whatsapp_sender import send_whatsapp_message
 logger = logging.getLogger("beli.birthday")
 
 _CDMX_TZ = zoneinfo.ZoneInfo("America/Mexico_City")
+
+# Every automated birthday message carries this signature. The messages go out
+# from Diego's own WhatsApp number, so without it the recipient cannot tell who
+# is actually writing.
+_SIGNATURE = "(Beli, asistente de Diego)"
 
 
 def check_and_send_birthdays(
@@ -102,14 +107,10 @@ def _is_success(result: str) -> bool:
 def _send_direct_greeting(
     waha_url: str, session: str, api_key: str, name: str, phone: str
 ) -> str:
-    # Written in FIRST person and signed: the message goes out from the owner's
-    # own WhatsApp number (ghost mode), so third-person wording ("Diego te manda
-    # un abrazo") reads like an assistant wrote it and leaves the recipient
-    # unsure who is writing.
     msg = (
         f"¡Feliz cumpleaños {name}! 🎂 "
-        f"Te mando un abrazo enorme, te escribo personalmente en un rato.\n"
-        f"— Diego"
+        f"Diego te manda un abrazo enorme — te escribirá personalmente en un rato. "
+        f"{_SIGNATURE}"
     )
     result = send_whatsapp_message(
         waha_url=waha_url, recipient=phone, message=msg, session=session, api_key=api_key,
@@ -125,8 +126,8 @@ def _send_parent_notification(
 ) -> str:
     msg = (
         f"¡Hoy cumple años {child_name}! 🎉 "
-        f"Te escribo pronto.\n"
-        f"— Diego"
+        f"Diego te escribirá pronto. "
+        f"{_SIGNATURE}"
     )
     result = send_whatsapp_message(
         waha_url=waha_url, recipient=parent_phone, message=msg, session=session, api_key=api_key,
