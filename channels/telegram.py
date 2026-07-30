@@ -899,12 +899,18 @@ class TelegramChannel:
             if delivered:
                 already_sent.update(delivered)
                 await self.memory.save_setting(today_key, json.dumps(sorted(already_sent)))
-                if retry_num > 0:
-                    # A retry finally got through — tell the owner it's resolved
-                    await context.bot.send_message(
-                        chat_id=self._owner_chat_id,
-                        text=f"✅ Mensaje(s) de cumpleaños entregado(s) tras reintento: {', '.join(delivered)}.",
-                    )
+                # Always confirm to the owner — a birthday message goes out in
+                # their name, so they must know it was sent (and to whom) even
+                # when it succeeds on the first try.
+                names = ", ".join(delivered)
+                suffix = " (tras reintento)" if retry_num > 0 else ""
+                await context.bot.send_message(
+                    chat_id=self._owner_chat_id,
+                    text=(
+                        f"🎂 Mensaje de cumpleaños enviado a {names}{suffix} ✓\n"
+                        f"Recuerda escribirle personalmente."
+                    ),
+                )
 
             if failures:
                 if retry_num == 0:
