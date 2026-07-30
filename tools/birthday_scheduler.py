@@ -28,9 +28,12 @@ _CDMX_TZ = zoneinfo.ZoneInfo("America/Mexico_City")
 # is actually writing.
 _SIGNATURE = "(Beli, asistente de Diego)"
 
-# Sentence that follows the greeting in a "sobrino" message. Some kids get a
-# message from Diego directly, others are reached through their parent, so a
-# contact may override this with its own "followup" field in BIRTHDAY_CONTACTS.
+# Sentence that follows the greeting. Any contact may override it with its own
+# "followup" field in BIRTHDAY_CONTACTS — used when Diego reaches that person
+# differently, or when they are addressed formally ("le" instead of "te").
+_DEFAULT_DIRECT_FOLLOWUP = (
+    "Diego te manda un abrazo enorme — te escribirá personalmente en un rato."
+)
 _DEFAULT_SOBRINO_FOLLOWUP = "Diego se pondrá en contacto contigo durante el día."
 
 
@@ -80,7 +83,10 @@ def check_and_send_birthdays(
                 phone = contact.get("phone", "")
                 if phone:
                     attempted += 1
-                    result = _send_direct_greeting(waha_url, session, api_key, name, phone)
+                    result = _send_direct_greeting(
+                        waha_url, session, api_key, name, phone,
+                        followup=contact.get("followup") or _DEFAULT_DIRECT_FOLLOWUP,
+                    )
                     if _is_success(result):
                         delivered.append(name)
                     else:
@@ -112,11 +118,12 @@ def _is_success(result: str) -> bool:
 
 
 def _send_direct_greeting(
-    waha_url: str, session: str, api_key: str, name: str, phone: str
+    waha_url: str, session: str, api_key: str, name: str, phone: str,
+    followup: str = _DEFAULT_DIRECT_FOLLOWUP,
 ) -> str:
     msg = (
         f"¡Feliz cumpleaños {name}! 🎂 "
-        f"Diego te manda un abrazo enorme — te escribirá personalmente en un rato. "
+        f"{followup} "
         f"{_SIGNATURE}"
     )
     result = send_whatsapp_message(
