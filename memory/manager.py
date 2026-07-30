@@ -145,6 +145,18 @@ class MemoryManager:
                 rows = await cursor.fetchall()
         return [{"id": row["id"], "role": row["role"], "content": row["content"]} for row in rows]
 
+    async def get_all_facts(self) -> list[str]:
+        """Returns every stored fact, across all channels and users.
+
+        Reads user_facts directly rather than going through the conversation
+        list, so facts survive a cleared history.
+        """
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute("SELECT fact FROM user_facts ORDER BY id") as cursor:
+                rows = await cursor.fetchall()
+        return [row["fact"] for row in rows]
+
     async def get_all_active_users(self) -> list[tuple[str, str]]:
         """Returns all (channel, user_id) pairs that have conversations."""
         async with aiosqlite.connect(self.db_path) as db:

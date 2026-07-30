@@ -944,8 +944,45 @@ class TelegramChannel:
                             "pendientes. Envíalos manualmente, por favor."
                         ),
                     )
+            if retry_num == 0:
+                await self._alert_unscheduled_birthdays(context)
         except Exception as e:
             logger.exception(f"Error in birthday check job: {e}")
+
+    async def _alert_unscheduled_birthdays(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Warns about birthdays Beli remembers but was never told to celebrate.
+
+        The scheduler only reads BIRTHDAY_CONTACTS, so a birthday mentioned in
+        chat is stored as a memory fact and never triggers a message. Each
+        person is reported only once.
+        """
+        from tools.birthday_scheduler import find_unscheduled_birthdays, format_date_es
+        try:
+            facts = await self.memory.get_all_facts()
+            pending = find_unscheduled_birthdays(facts, self._birthday_contacts_json)
+            if not pending:
+                return
+
+            alerted_raw = await self.memory.get_setting("birthday_memory_alerted")
+            alerted = set(json.loads(alerted_raw)) if alerted_raw else set()
+            new = [p for p in pending if p[0] not in alerted]
+            if not new:
+                return
+
+            detail = "\n".join(f"• {n} — {format_date_es(m, d)}" for n, m, d in new)
+            await context.bot.send_message(
+                chat_id=self._owner_chat_id,
+                text=(
+                    f"🎂 Recuerdo estos cumpleaños, pero NO están en la lista de "
+                    f"recordatorios, así que no le escribiré a nadie ese día:\n{detail}\n\n"
+                    f"Si quieres que los felicite, pídeme que los agregue con su número."
+                ),
+            )
+            alerted.update(n for n, _, _ in new)
+            await self.memory.save_setting("birthday_memory_alerted", json.dumps(sorted(alerted)))
+            logger.info(f"[Birthday] Reported {len(new)} unscheduled birthday(s) from memory.")
+        except Exception as e:
+            logger.exception(f"[Birthday] Could not check memory birthdays: {e}")
 
     async def _job_morning_agenda(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Daily job at morning_agenda_hour: sends the day's calendar agenda if toggle is on."""

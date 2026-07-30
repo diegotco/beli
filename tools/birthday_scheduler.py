@@ -14,6 +14,7 @@ with _SIGNATURE so the recipient knows who is actually writing.
 import json
 import logging
 import datetime
+import re
 import zoneinfo
 
 from tools.whatsapp_sender import send_whatsapp_message
@@ -142,3 +143,81 @@ def _send_parent_notification(
     )
     logger.info(f"[Birthday] Parent notification → {parent_name} (for {child_name}): {result}")
     return result
+
+
+# ── Birthdays Beli knows but was never told to act on ────────────────────────
+# The scheduler only reads BIRTHDAY_CONTACTS. A birthday mentioned in chat is
+# stored as a memory fact and would otherwise never trigger a message, so we
+# surface those to the owner instead of letting them sit there unnoticed.
+
+_MONTHS_ES = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+]
+_MONTHS_EN = [
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december",
+]
+_MONTH_NUM = {m: i + 1 for i, m in enumerate(_MONTHS_ES)}
+_MONTH_NUM.update({m: i + 1 for i, m in enumerate(_MONTHS_EN)})
+
+_MENTIONS_BIRTHDAY = re.compile(r"birthday|cumplea", re.I)
+_DATE_EN = re.compile(r"\b(" + "|".join(_MONTHS_EN) + r")\s+(\d{1,2})\b", re.I)
+_DATE_ES = re.compile(r"\b(\d{1,2})\s+de\s+(" + "|".join(_MONTHS_ES) + r")\b", re.I)
+_NAME_PATTERNS = [
+    re.compile(r"['\"]([^'\"]{2,40})['\"]"),                       # named 'Amistaa'
+    re.compile(r"\bnamed\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]*)", re.U),  # named Amistaa
+    re.compile(r"\bllamad[oa]\s+([A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ]*)", re.U),
+]
+
+
+def format_date_es(month: int, day: int) -> str:
+    """'29 de mayo' — for showing a birthday back to the owner."""
+    return f"{day} de {_MONTHS_ES[month - 1]}"
+
+
+def _extract_birthday(fact: str) -> tuple[str, int, int] | None:
+    """Parses '...named X whose birthday is May 29' → ('X', 5, 29). None if absent."""
+    if not _MENTIONS_BIRTHDAY.search(fact):
+        return None
+
+    if m := _DATE_EN.search(fact):
+        month, day = _MONTH_NUM[m.group(1).lower()], int(m.group(2))
+    elif m := _DATE_ES.search(fact):
+        month, day = _MONTH_NUM[m.group(2).lower()], int(m.group(1))
+    else:
+        return None
+    if not (1 <= day <= 31):
+        return None
+
+    for pattern in _NAME_PATTERNS:
+        if n := pattern.search(fact):
+            return n.group(1).strip(), month, day
+    return None
+
+
+def find_unscheduled_birthdays(
+    facts: list[str], contacts_json: str
+) -> list[tuple[str, int, int]]:
+    """
+    Returns (name, month, day) for every birthday found in memory facts whose
+    person is NOT in BIRTHDAY_CONTACTS — i.e. birthdays that would silently
+    never be celebrated. Sorted by name.
+    """
+    try:
+        contacts = json.loads(contacts_json) if contacts_json else []
+    except Exception:
+        contacts = []
+    known = {str(c.get("name", "")).strip().lower() for c in contacts}
+
+    found: dict[str, tuple[int, int]] = {}
+    for fact in facts:
+        parsed = _extract_birthday(fact)
+        if not parsed:
+            continue
+        name, month, day = parsed
+        if name.lower() in known:
+            continue
+        found[name] = (month, day)
+
+    return sorted((n, m, d) for n, (m, d) in found.items())
