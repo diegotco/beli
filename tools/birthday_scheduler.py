@@ -27,6 +27,11 @@ _CDMX_TZ = zoneinfo.ZoneInfo("America/Mexico_City")
 # is actually writing.
 _SIGNATURE = "(Beli, asistente de Diego)"
 
+# Sentence that follows the greeting in a "sobrino" message. Some kids get a
+# message from Diego directly, others are reached through their parent, so a
+# contact may override this with its own "followup" field in BIRTHDAY_CONTACTS.
+_DEFAULT_SOBRINO_FOLLOWUP = "Diego se pondrá en contacto contigo durante el día."
+
 
 def check_and_send_birthdays(
     waha_url: str,
@@ -86,7 +91,8 @@ def check_and_send_birthdays(
                 if parent_phone:
                     attempted += 1
                     result = _send_parent_notification(
-                        waha_url, session, api_key, name, parent_name, parent_phone
+                        waha_url, session, api_key, name, parent_name, parent_phone,
+                        followup=contact.get("followup") or _DEFAULT_SOBRINO_FOLLOWUP,
                     )
                     if _is_success(result):
                         delivered.append(name)
@@ -122,11 +128,12 @@ def _send_direct_greeting(
 
 def _send_parent_notification(
     waha_url: str, session: str, api_key: str,
-    child_name: str, parent_name: str, parent_phone: str
+    child_name: str, parent_name: str, parent_phone: str,
+    followup: str = _DEFAULT_SOBRINO_FOLLOWUP,
 ) -> str:
     msg = (
-        f"¡Hoy cumple años {child_name}! 🎉 "
-        f"Diego te escribirá pronto. "
+        f"¡Feliz cumpleaños a {child_name}! 🎉 "
+        f"{followup} "
         f"{_SIGNATURE}"
     )
     result = send_whatsapp_message(
