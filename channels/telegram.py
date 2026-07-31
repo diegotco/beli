@@ -1368,15 +1368,23 @@ def _load_reminders() -> str:
         if not path.exists():
             return ""
         lines = path.read_text(encoding="utf-8").splitlines()
-    # Skip header/preamble lines; start from the first section heading
-    output = []
-    in_preamble = True
+    # Real content starts at the first "## " heading — everything above it is the
+    # file's own documentation and must never reach the owner's chat. As the file
+    # tells the owner, a "#" comments a reminder out; commenting its heading
+    # ("# ## Firecrawl") drops the whole block, not just the title line.
+    output: list[str] = []
+    started = False   # reached the first real "## " heading yet?
+    disabled = False  # inside a commented-out block?
     for line in lines:
-        if in_preamble and (not line.strip() or line.startswith("#") or line.startswith(">")):
-            if line.startswith("## "):
-                in_preamble = False  # First section heading = real content starts
-            else:
-                continue
+        if line.startswith("## "):
+            started, disabled = True, False
+        elif line.lstrip("#").lstrip().startswith("## "):
+            disabled = True
+            continue
+        elif line.startswith("#"):
+            continue
+        if not started or disabled:
+            continue
         output.append(line)
     return "\n".join(output).strip()
 
