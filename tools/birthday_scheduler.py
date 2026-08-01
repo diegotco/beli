@@ -51,9 +51,11 @@ def check_and_send_birthdays(
     skip_names: contacts already delivered today (used by the retry job so a
     second pass never double-sends).
 
-    Returns (failures, delivered_names):
-      failures        — human-readable failure descriptions (empty = all good)
-      delivered_names — names successfully delivered in THIS pass
+    Returns (failures, delivered):
+      failures  — human-readable failure descriptions (empty = all good)
+      delivered — (name, confirmation sentence) for each message sent in THIS
+                  pass; the name is the retry/skip key, the sentence is what
+                  the owner is shown.
     """
     if not contacts_json or not waha_url:
         logger.debug("[Birthday] Skipped — BIRTHDAY_CONTACTS or WAHA_URL not configured.")
@@ -70,7 +72,7 @@ def check_and_send_birthdays(
 
     attempted = 0
     failures: list[str] = []
-    delivered: list[str] = []
+    delivered: list[tuple[str, str]] = []
     for contact in contacts:
         if contact.get("month") == today.month and contact.get("day") == today.day:
             contact_type = contact.get("type", "direct")
@@ -88,7 +90,7 @@ def check_and_send_birthdays(
                         followup=contact.get("followup") or _DEFAULT_DIRECT_FOLLOWUP,
                     )
                     if _is_success(result):
-                        delivered.append(name)
+                        delivered.append((name, describe_delivery(contact)))
                     else:
                         failures.append(f"Felicitación a {name}: {result}")
 
@@ -102,7 +104,7 @@ def check_and_send_birthdays(
                         followup=contact.get("followup") or _DEFAULT_SOBRINO_FOLLOWUP,
                     )
                     if _is_success(result):
-                        delivered.append(name)
+                        delivered.append((name, describe_delivery(contact)))
                     else:
                         failures.append(f"Aviso a {parent_name} (cumple {name}): {result}")
 
@@ -115,6 +117,26 @@ def check_and_send_birthdays(
 
 def _is_success(result: str) -> bool:
     return result.startswith("✓")
+
+
+# Default for a "sobrino" whose contact record doesn't say who the parent is to
+# them. Every current one is reached through their father.
+_DEFAULT_PARENT_RELATION = "su papá"
+
+
+def describe_delivery(contact: dict) -> str:
+    """
+    How the owner is told a birthday message went out, phrased by relationship
+    ("tu mami", "tu hermano Sensei") instead of by the raw contact name.
+
+    A contact can set "relation" (direct) or "parent_relation" (sobrino) in
+    BIRTHDAY_CONTACTS; otherwise the contact's own name is used.
+    """
+    name = contact.get("name", "")
+    if contact.get("type") == "sobrino":
+        parent = contact.get("parent_relation") or _DEFAULT_PARENT_RELATION
+        return f"Mensaje de cumpleaños de {name} enviado a {parent}."
+    return f"Mensaje de cumpleaños enviado a {contact.get('relation') or name} ✓"
 
 
 def _send_direct_greeting(
