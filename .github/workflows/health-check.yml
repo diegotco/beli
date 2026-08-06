@@ -1,13 +1,18 @@
 name: Beli Health Check
 
 on:
+  # Every 30 minutes. GitHub heavily throttles scheduled workflows on free
+  # repos — a */10 cron actually fired every ~105 min on average — so a
+  # tighter schedule buys nothing and only queues more jobs, which is how
+  # runs get cancelled with "job was not acquired by Runner of type hosted".
   schedule:
-    - cron: "*/10 * * * *"  # every 10 minutes
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       # WAHA is NOT checked here on purpose: Beli's internal health monitor
       # polls it every 5 minutes with deduplication (one alert per outage).
